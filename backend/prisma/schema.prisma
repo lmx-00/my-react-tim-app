@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(uuid())
+  username     String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  failedLogins Int            @default(0)
+  lockedUntil  DateTime?
+  progress     UserProgress?
+  sessions     GameSession[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Level {
+  id             Int    @id
+  name           String
+  rows           Int
+  cols           Int
+  colorCount     Int
+  moveLimit      Int
+  goalType       String
+  goalPayload    Json
+  twoStarMoves   Int
+  threeStarMoves Int
+}
+
+model UserProgress {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  maxCleared Int      @default(0)
+  levelStars Json     @default("{}")
+  levelBest  Json     @default("{}")
+  updatedAt  DateTime @updatedAt
+}
+
+model GameSession {
+  id           String    @id @default(uuid())
+  userId       String
+  levelId      Int
+  status       String    @default("playing")
+  board        Json
+  rngState     String
+  score        Int       @default(0)
+  movesLeft    Int
+  moveCount    Int       @default(0)
+  collected    Json      @default("{}")
+  goalProgress Json
+  stars        Int       @default(0)
+  startedAt    DateTime  @default(now())
+  lastMoveAt   DateTime  @default(now())
+  endedAt      DateTime?
+  durationMs   Int?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, endedAt])
+}

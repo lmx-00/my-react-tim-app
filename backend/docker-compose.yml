@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: happy-match-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: match
+      POSTGRES_PASSWORD: match
+      POSTGRES_DB: happy_match
+    ports:
+      - "5432:5432"
+    volumes:
+      - happy_match_pg:/var/lib/postgresql/data
+
+volumes:
+  happy_match_pg:
