@@ -1,5 +1,6 @@
 import {
   BASE_TYPES,
+  RAINBOW_BLAST_RADIUS,
   SCORE,
   cellKey,
   cloneBoard,
@@ -7,6 +8,7 @@ import {
   inBounds,
   matchColor,
   parseKey,
+  rainbowCountForLevel,
 } from './constants.js'
 import { pickType } from './rng.js'
 
@@ -133,7 +135,7 @@ function specialFromRuns(board, key, horizontal, vertical) {
   const hLen = horizontal.get(key) ?? 0
   const vLen = vertical.get(key) ?? 0
   const color = matchColor(tile)
-  if (hLen >= 5 || vLen >= 5) return { type: 'rainbow' }
+  if (hLen >= 5 || vLen >= 5) return { type: 'bomb', color }
   if (hLen >= 3 && vLen >= 3) return { type: 'bomb', color }
   if (hLen >= 4) return { type: 'rocket', dir: 'row', color }
   if (vLen >= 4) return { type: 'rocket', dir: 'col', color }
@@ -206,15 +208,13 @@ function collectBlast(board, startCells, rainbowColor) {
       } else {
         for (let r = 0; r < board.rows; r += 1) queue.push({ row: r, col, reason: 'rocket' })
       }
-    } else if (tile.type === 'bomb') {
+    } else if (tile.type === 'bomb' || tile.type === 'rainbow') {
       activated.add(key)
-      for (let dr = -1; dr <= 1; dr += 1) {
-        for (let dc = -1; dc <= 1; dc += 1) {
+      for (let dr = -RAINBOW_BLAST_RADIUS; dr <= RAINBOW_BLAST_RADIUS; dr += 1) {
+        for (let dc = -RAINBOW_BLAST_RADIUS; dc <= RAINBOW_BLAST_RADIUS; dc += 1) {
           queue.push({ row: row + dr, col: col + dc, reason: 'bomb' })
         }
       }
-    } else if (tile.type === 'rainbow' && !rainbowColor) {
-      activated.add(key)
     }
   }
 
@@ -351,40 +351,32 @@ function resolveWaves(board, rng, colorCount, swapCells) {
   return { events, scoreDelta, collected, waves: wave - 1 }
 }
 
-function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
-  const a = board.cells[y1][x1]
-  const b = board.cells[y2][x2]
-  const rainbowPos = a.type === 'rainbow' ? [y1, x1] : [y2, x2]
-  const other = a.type === 'rainbow' ? b : a
-  const otherPos = a.type === 'rainbow' ? [y2, x2] : [y1, x1]
-  const color = other.type === 'rainbow' ? null : matchColor(other)
-
-  const start = [rainbowPos, otherPos]
-  const { toClear, extraScores } = collectBlast(
-    board,
-    start,
-    color,
-  )
-
-  if (other.type === 'rainbow') {
-    for (let row = 0; row < board.rows; row += 1) {
-      for (let col = 0; col < board.cols; col += 1) {
-        toClear.add(cellKey(row, col))
-        extraScores.rainbow += SCORE.rainbow
-      }
+function blastRadiusCells(row, col, radius) {
+  const cells = []
+  for (let dr = -radius; dr <= radius; dr += 1) {
+    for (let dc = -radius; dc <= radius; dc += 1) {
+      cells.push([row + dr, col + dc])
     }
   }
+  return cells
+}
+
+function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
+  const a = board.cells[y1][x1]
+  const rainbowPos = a.type === 'rainbow' ? [y1, x1] : [y2, x2]
+  const start = blastRadiusCells(rainbowPos[0], rainbowPos[1], RAINBOW_BLAST_RADIUS)
+  const { toClear, extraScores } = collectBlast(board, start, null)
 
   const collected = {}
   tallyCleared(board, toClear, collected)
   const waveScore = Math.round(
-    (extraScores.rocket + extraScores.bomb + extraScores.rainbow) * comboMultiplier(1),
+    (SCORE.rainbow + extraScores.rocket + extraScores.bomb + extraScores.rainbow) * comboMultiplier(1),
   )
 
   const events = [
     {
       type: 'rainbow',
-      color,
+      color: null,
       cells: [...toClear].map(parseKey),
       wave: 1,
       score: waveScore,
@@ -474,6 +466,29 @@ function plantGuaranteedMove(board, rng, colorCount) {
   board.cells[0][3] = { type: a }
 }
 
+function plantRainbowBombs(board, rng, count) {
+  if (count <= 0) return
+  const spots = []
+  for (let row = 0; row < board.rows; row += 1) {
+    for (let col = 0; col < board.cols; col += 1) {
+      if (board.cells[row][col]?.type !== 'rainbow') spots.push([row, col])
+    }
+  }
+  for (let i = spots.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[spots[i], spots[j]] = [spots[j], spots[i]]
+  }
+  for (let i = 0; i < count && i < spots.length; i += 1) {
+    const [row, col] = spots[i]
+    board.cells[row][col] = { type: 'rainbow' }
+  }
+}
+
+function finishBoard(board, rng, levelConfig) {
+  plantRainbowBombs(board, rng, rainbowCountForLevel(levelConfig))
+  return board
+}
+
 export function createBoard(levelConfig, rng) {
   const { rows, cols, colorCount } = levelConfig
   for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -482,7 +497,9 @@ export function createBoard(levelConfig, rng) {
     )
     const board = { rows, cols, cells }
     breakExistingMatches(board, rng, colorCount)
-    if (!hasMatch(board) && findLegalMoves(board).length > 0) return board
+    if (!hasMatch(board) && findLegalMoves(board).length > 0) {
+      return finishBoard(board, rng, levelConfig)
+    }
   }
   const cells = Array.from({ length: rows }, () =>
     Array.from({ length: cols }, () => ({ type: pickType(rng, colorCount) })),
@@ -493,7 +510,7 @@ export function createBoard(levelConfig, rng) {
   if (hasMatch(board) || findLegalMoves(board).length === 0) {
     shuffleBoard(board, rng, colorCount)
   }
-  return board
+  return finishBoard(board, rng, levelConfig)
 }
 
 export function applySwap(board, move, levelConfig, rng) {

@@ -15,12 +15,14 @@ export function PlayPage() {
   const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(false)
   const [shaking, setShaking] = useState(false)
+  const [blasting, setBlasting] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     setSession(null)
     setSelected(null)
+    setBlasting([])
     setError('')
 
     createSession(levelId)
@@ -52,11 +54,6 @@ export function PlayPage() {
         x2: to.x,
         y2: to.y,
       })
-      if (!result.valid) {
-        setShaking(true)
-        window.setTimeout(() => setShaking(false), 420)
-        return
-      }
       setSession((current) => ({
         ...current,
         board: result.board,
@@ -66,6 +63,16 @@ export function PlayPage() {
         status: result.status,
         stars: result.stars,
       }))
+      if (!result.valid) {
+        setShaking(true)
+        window.setTimeout(() => setShaking(false), 420)
+      } else {
+        const blast = result.events?.find((event) => event.type === 'rainbow')
+        if (blast?.cells?.length) {
+          setBlasting(blast.cells.map(([y, x]) => `${y}-${x}`))
+          window.setTimeout(() => setBlasting([]), 520)
+        }
+      }
       if (result.status === 'won' || result.status === 'lost') {
         navigate(`/result/${session.sessionId}`, { replace: true })
       }
@@ -125,6 +132,9 @@ export function PlayPage() {
   }
 
   const lowMoves = session.movesLeft <= 5
+  const hasRainbow = session.board.cells.some((row) =>
+    row.some((tile) => tile?.type === 'rainbow'),
+  )
 
   return (
     <section className="stack play-stack">
@@ -135,6 +145,9 @@ export function PlayPage() {
           </h1>
           <p>目标：{goalText(session.level)}</p>
           <p>{goalProgressText(session.level, session.score, session.goalProgress)}</p>
+          {hasRainbow ? (
+            <p className="muted">彩虹炸弹和旁边一换，炸掉周围一圈。</p>
+          ) : null}
         </div>
         <div className="hud-stats">
           <span>
@@ -152,6 +165,7 @@ export function PlayPage() {
         onSelect={handleSelect}
         disabled={busy}
         shaking={shaking}
+        blasting={blasting}
       />
       <div className="actions">
         <button type="button" className="btn btn-ghost" onClick={handleQuit} disabled={busy}>

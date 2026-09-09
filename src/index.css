@@ -410,6 +410,22 @@ p {
   margin-top: 8px;
 }
 
+.hero-cast {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.hero-cast .tile {
+  width: 88px;
+  height: 88px;
+  flex: none;
+  cursor: default;
+  box-shadow: inset 0 -3px 0 rgba(30, 110, 160, 0.08);
+}
+
 .stack {
   background: var(--panel);
   border: 2px solid #fff;
@@ -643,13 +659,37 @@ p {
 }
 
 .tile {
+  position: relative;
   aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
   border: 0;
   border-radius: 12px;
   background: #f4fbff;
-  font-size: clamp(18px, 4.2vw, 28px);
   cursor: pointer;
   box-shadow: inset 0 -3px 0 rgba(30, 110, 160, 0.08);
+}
+
+.monster {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.monster-part {
+  position: absolute;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.monster-fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .tile.is-selected {
@@ -662,15 +702,58 @@ p {
   cursor: default;
 }
 
-.tile-bear { background: #ffe8d6; }
-.tile-cat { background: #ffe5c4; }
-.tile-fox { background: #ffd7ba; }
-.tile-frog { background: #d8f5a2; }
-.tile-chick { background: #fff3bf; }
-.tile-owl { background: #e5dbff; }
-.tile-rocket { background: #d0ebff; }
-.tile-bomb { background: #ffc9c9; }
-.tile-rainbow { background: #e5dbff; }
+.tile-bear { background: #f3e0c8; }
+.tile-cat { background: #ffd6e8; }
+.tile-fox { background: #ffe0a8; }
+.tile-frog { background: #d4f5b0; }
+.tile-chick { background: #fff4b8; }
+.tile-owl { background: #ccecff; }
+.tile-rocket { background: #d6f0ff; }
+.tile-bomb { background: #e8d8d0; }
+.tile-rainbow {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 35% 28%, #fff 0%, #f4e8ff 42%, #d9c2ff 100%);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 14px 4px rgba(168, 85, 247, 0.55),
+    0 0 28px 10px rgba(56, 189, 248, 0.35),
+    inset 0 -3px 0 rgba(120, 60, 200, 0.18);
+  animation: rainbow-pulse 1.5s ease-in-out infinite;
+}
+
+.tile-rainbow.is-selected {
+  outline-color: #a855f7;
+}
+
+.tile.is-blasting {
+  z-index: 2;
+  animation: tile-blast 0.5s ease;
+}
+
+@keyframes rainbow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.9),
+      0 0 12px 3px rgba(168, 85, 247, 0.45),
+      0 0 22px 8px rgba(56, 189, 248, 0.28),
+      inset 0 -3px 0 rgba(120, 60, 200, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 1),
+      0 0 18px 7px rgba(236, 72, 153, 0.55),
+      0 0 34px 14px rgba(56, 189, 248, 0.4),
+      inset 0 -3px 0 rgba(120, 60, 200, 0.18);
+  }
+}
+
+@keyframes tile-blast {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.18); filter: brightness(1.45); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
 
 .result-stack {
   align-items: center;

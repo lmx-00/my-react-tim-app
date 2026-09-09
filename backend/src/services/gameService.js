@@ -217,8 +217,11 @@ export async function playMove(userId, sessionId, move) {
   const config = getLevelConfig(level.id)
   const rng = rngFromState(session.rngState)
   const result = applySwap(session.board, move, config, rng)
+  const adjacent =
+    Math.abs(Number(move.x1) - Number(move.x2)) + Math.abs(Number(move.y1) - Number(move.y2)) === 1
 
-  if (!result.valid) {
+  // 不相邻的请求不算一步；相邻但没消掉的交换会弹回，仍然扣步。
+  if (!result.valid && !adjacent) {
     return {
       valid: false,
       events: [],
@@ -232,14 +235,16 @@ export async function playMove(userId, sessionId, move) {
   }
 
   const collected = { ...(session.collected ?? {}) }
-  for (const [type, count] of Object.entries(result.collected)) {
-    collected[type] = (collected[type] ?? 0) + count
+  if (result.valid) {
+    for (const [type, count] of Object.entries(result.collected)) {
+      collected[type] = (collected[type] ?? 0) + count
+    }
   }
 
-  const score = session.score + result.scoreDelta
+  const score = result.valid ? session.score + result.scoreDelta : session.score
   const movesLeft = session.movesLeft - 1
   const goalProgress = buildGoalProgress(level, score, collected)
-  const won = isGoalMet(level, score, collected)
+  const won = result.valid && isGoalMet(level, score, collected)
   const lost = !won && movesLeft <= 0
   const finish = won
     ? finishSession({ ...session, movesLeft, score }, 'won', level)
@@ -250,8 +255,8 @@ export async function playMove(userId, sessionId, move) {
   const updated = await prisma.gameSession.update({
     where: { id: session.id },
     data: {
-      board: result.board,
-      rngState: rng.getState(),
+      board: result.valid ? result.board : session.board,
+      rngState: result.valid ? rng.getState() : session.rngState,
       score,
       movesLeft,
       moveCount: session.moveCount + 1,
@@ -267,7 +272,7 @@ export async function playMove(userId, sessionId, move) {
   }
 
   return {
-    valid: true,
+    valid: result.valid,
     events: result.events,
     board: updated.board,
     score: updated.score,

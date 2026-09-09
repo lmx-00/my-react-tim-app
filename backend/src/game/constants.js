@@ -17,6 +17,15 @@ export const SCORE = {
   rainbow: 60,
 }
 
+export const RAINBOW_BLAST_RADIUS = 1
+
+export function rainbowCountForLevel(levelConfig) {
+  const id = Number(levelConfig?.id ?? 0)
+  if (id < 2) return 0
+  if (id >= 12) return 2
+  return 1
+}
+
 export function comboMultiplier(wave) {
   if (wave <= 1) return 1
   if (wave === 2) return 1.2

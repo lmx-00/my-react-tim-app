@@ -1,15 +1,3 @@
-export const TILE_EMOJI = {
-  bear: '🐻',
-  cat: '🐱',
-  fox: '🦊',
-  frog: '🐸',
-  chick: '🐥',
-  owl: '🦉',
-  rocket: '🚀',
-  bomb: '💣',
-  rainbow: '🌈',
-}
-
 export const TILE_NAME = {
   bear: '小熊',
   cat: '小猫',
@@ -19,16 +7,11 @@ export const TILE_NAME = {
   owl: '猫头鹰',
 }
 
-export function tileEmoji(tile) {
-  if (!tile) return ''
-  return TILE_EMOJI[tile.type] ?? '❓'
-}
-
 export function tileLabel(tile) {
   if (!tile) return '空格'
   if (tile.type === 'rocket') return tile.dir === 'row' ? '横火箭' : '竖火箭'
   if (tile.type === 'bomb') return '炸弹'
-  if (tile.type === 'rainbow') return '彩虹鸟'
+  if (tile.type === 'rainbow') return '彩虹炸弹'
   return TILE_NAME[tile.type] ?? tile.type
 }
 

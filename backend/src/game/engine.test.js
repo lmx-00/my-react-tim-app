@@ -82,9 +82,38 @@ describe('match-3 engine', () => {
 
   it('generates a playable board with no opening match', () => {
     const rng = createRng(99)
-    const board = createBoard({ rows: 8, cols: 8, colorCount: 5 }, rng)
+    const board = createBoard({ id: 1, rows: 8, cols: 8, colorCount: 5 }, rng)
     assert.equal(hasMatch(board), false)
     assert.ok(findLegalMoves(board).length > 0)
+    assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 0)
+  })
+
+  it('plants one rainbow bomb from level 2', () => {
+    const rng = createRng(99)
+    const board = createBoard({ id: 2, rows: 8, cols: 8, colorCount: 6 }, rng)
+    assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 1)
+  })
+
+  it('plants two rainbow bombs from level 12', () => {
+    const rng = createRng(21)
+    const board = createBoard({ id: 12, rows: 8, cols: 8, colorCount: 6 }, rng)
+    assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 2)
+  })
+
+  it('detonates a 3x3 when swapping a rainbow with any neighbor', () => {
+    const board = boardFrom([
+      ['bear', 'cat', 'fox', 'frog'],
+      ['cat', 'rainbow', 'frog', 'owl'],
+      ['fox', 'owl', 'cat', 'frog'],
+      ['owl', 'frog', 'fox', 'cat'],
+    ])
+    const rng = createRng(1)
+    const result = applySwap(board, { x1: 1, y1: 1, x2: 0, y2: 1 }, { colorCount: 6 }, rng)
+    assert.equal(result.valid, true)
+    const blast = result.events.find((event) => event.type === 'rainbow')
+    assert.ok(blast)
+    assert.ok(blast.cells.length >= 6)
+    assert.ok(result.scoreDelta > 0)
   })
 
   it('keeps the original board intact on invalid moves', () => {
