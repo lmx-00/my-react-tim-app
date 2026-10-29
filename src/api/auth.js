@@ -14,10 +14,6 @@ export function registerRequest(username, password) {
   })
 }
 
-export function refreshRequest() {
-  return api('/auth/refresh', { method: 'POST' })
-}
-
 export function logoutRequest() {
   return api('/auth/logout', { method: 'POST' })
 }

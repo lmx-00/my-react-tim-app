@@ -17,8 +17,8 @@ export function verifyAccessToken(token) {
 export function refreshCookieOptions() {
   return {
     httpOnly: true,
-    secure: config.isProd,
-    sameSite: 'lax',
+    secure: config.isProd || config.cookieSameSite === 'none',
+    sameSite: config.cookieSameSite,
     path: '/api/auth',
     maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
   }

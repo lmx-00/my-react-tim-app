@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_LEVEL_ID } from '../game/levels.js'
 
 export const registerSchema = z.object({
   username: z
@@ -20,7 +21,7 @@ export const loginSchema = z.object({
 })
 
 export const createSessionSchema = z.object({
-  levelId: z.coerce.number().int().min(1).max(30),
+  levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID),
 })
 
 export const moveSchema = z.object({
@@ -34,5 +35,5 @@ export const recordsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
   result: z.enum(['won', 'lost', 'quit', 'expired']).optional(),
-  levelId: z.coerce.number().int().min(1).max(30).optional(),
+  levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID).optional(),
 })

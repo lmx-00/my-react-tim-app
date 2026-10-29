@@ -48,7 +48,7 @@ export function ResultPage() {
   }
 
   const won = session.status === 'won'
-  const nextId = session.level.id + 1
+  const nextId = session.nextLevelId
 
   return (
     <section className="stack result-stack">
@@ -60,7 +60,7 @@ export function ResultPage() {
       </p>
       <p className="lede">本局得分 {session.score}，剩余步数 {session.movesLeft}</p>
       <div className="actions">
-        {won && nextId <= 30 ? (
+        {won && nextId ? (
           <Link to={`/play/${nextId}`} className="btn">
             下一关
           </Link>

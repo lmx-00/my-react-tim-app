@@ -14,6 +14,14 @@ export async function issueAuth(res, user) {
   const refreshValue = createRefreshTokenValue()
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000)
 
+  // 每次刷新都会作废一张旧的，顺手把这个用户用不上的清掉，别让表一直涨
+  await prisma.refreshToken.deleteMany({
+    where: {
+      userId: user.id,
+      OR: [{ revoked: true }, { expiresAt: { lt: new Date() } }],
+    },
+  })
+
   await prisma.refreshToken.create({
     data: {
       userId: user.id,

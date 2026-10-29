@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth.js'
-import { setAuthToken } from '../api/client.js'
-
-const AuthContext = createContext(null)
+import { useEffect, useMemo, useState } from 'react'
+import { loginRequest, logoutRequest, registerRequest } from '../api/auth.js'
+import { onAuthChange, refreshAuth, setAuthToken } from '../api/client.js'
+import { AuthContext } from './useAuth.js'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -24,7 +23,18 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false
 
-    refreshRequest()
+    // 之后每次自动续期的结果同步回来；refresh token 也失效了就当退出登录
+    onAuthChange((data) => {
+      if (cancelled) return
+      if (data) {
+        setUser(data.user)
+        setAccessToken(data.accessToken)
+      } else {
+        clearAuth()
+      }
+    })
+
+    refreshAuth()
       .then((data) => {
         if (!cancelled) applyAuth(data)
       })
@@ -69,12 +79,4 @@ export function AuthProvider({ children }) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) {
-    throw new Error('useAuth 必须在 AuthProvider 内使用')
-  }
-  return ctx
 }

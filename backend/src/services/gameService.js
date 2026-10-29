@@ -4,6 +4,7 @@ import {
   createBoard,
 } from '../game/engine.js'
 import {
+  MAX_LEVEL_ID,
   buildGoalProgress,
   emptyGoalProgress,
   getLevelConfig,
@@ -89,9 +90,26 @@ async function persistExpired(session) {
   })
 }
 
+// 一局收尾：空闲太久的算过期，其余算中途退出，两种都要落用时
+async function closeSessions(sessions) {
+  const now = new Date()
+  for (const item of sessions) {
+    const expired = expireIfNeeded({ ...item }).status === 'expired'
+    await prisma.gameSession.update({
+      where: { id: item.id },
+      data: {
+        status: expired ? 'expired' : 'quit',
+        endedAt: now,
+        durationMs: now.getTime() - item.startedAt.getTime(),
+      },
+    })
+  }
+}
+
 function serializeSession(session, level) {
   return {
     sessionId: session.id,
+    nextLevelId: level.id < MAX_LEVEL_ID ? level.id + 1 : null,
     level: {
       id: level.id,
       name: level.name,
@@ -171,16 +189,14 @@ export async function createSession(userId, levelId) {
   const playing = await prisma.gameSession.findMany({
     where: { userId, status: 'playing' },
   })
-  if (playing.length) {
-    const now = new Date()
-    await prisma.gameSession.updateMany({
-      where: { userId, status: 'playing' },
-      data: {
-        status: 'quit',
-        endedAt: now,
-      },
-    })
-  }
+
+  // 同一关还没下完的对局直接接着玩，刷新页面不会丢进度、也不会留下废记录
+  const resumable = playing.find(
+    (item) => item.levelId === level.id && expireIfNeeded({ ...item }).status === 'playing',
+  )
+  if (resumable) return serializeSession(resumable, level)
+
+  await closeSessions(playing)
 
   const seed = randomSeed()
   const rng = rngFromState(seed)

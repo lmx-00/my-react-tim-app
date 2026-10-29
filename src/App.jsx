@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext.jsx'
 import { GuestOnly, RequireAuth } from './auth/RequireAuth.jsx'
 import { Layout } from './components/Layout.jsx'
@@ -10,6 +10,12 @@ import { ProfilePage } from './pages/Profile.jsx'
 import { RecordsPage } from './pages/Records.jsx'
 import { RegisterPage } from './pages/Register.jsx'
 import { ResultPage } from './pages/Result.jsx'
+
+// 换关卡就整块重挂载，对局状态不用自己手动清
+function PlayRoute() {
+  const { levelId } = useParams()
+  return <PlayPage key={levelId} />
+}
 
 export default function App() {
   return (
@@ -36,7 +42,7 @@ export default function App() {
             <Route element={<RequireAuth />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/levels" element={<LevelsPage />} />
-              <Route path="/play/:levelId" element={<PlayPage />} />
+              <Route path="/play/:levelId" element={<PlayRoute />} />
               <Route path="/result/:sessionId" element={<ResultPage />} />
               <Route path="/records" element={<RecordsPage />} />
               <Route path="/profile" element={<ProfilePage />} />

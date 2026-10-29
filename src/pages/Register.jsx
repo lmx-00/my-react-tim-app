@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext.jsx'
+import { useAuth } from '../auth/useAuth.js'
 
 const USERNAME_RULE = /^[a-zA-Z0-9_]{3,16}$/
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,32}$/
@@ -43,9 +43,9 @@ export function RegisterPage() {
   }
 
   return (
-    <section className="stack">
+    <section className="stack auth-stack">
       <h1>注册</h1>
-      <p>注册成功后会自动登录。</p>
+      <p className="lede">注册成功后会自动登录。</p>
       <form className="form" onSubmit={handleSubmit}>
         {error ? <p className="form-error">{error}</p> : null}
         <label>
@@ -81,7 +81,7 @@ export function RegisterPage() {
           {submitting ? '注册中…' : '注册'}
         </button>
       </form>
-      <p>
+      <p className="auth-foot">
         已有账号？<Link to="/login">去登录</Link>
       </p>
     </section>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext.jsx'
+import { useAuth } from '../auth/useAuth.js'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -34,9 +34,9 @@ export function LoginPage() {
   }
 
   return (
-    <section className="stack">
+    <section className="stack auth-stack">
       <h1>登录</h1>
-      <p>登录后才能进入关卡、对局和记录。</p>
+      <p className="lede">登录后才能进入关卡、对局和记录。</p>
       <form className="form" onSubmit={handleSubmit}>
         {error ? <p className="form-error">{error}</p> : null}
         <label>
@@ -62,7 +62,7 @@ export function LoginPage() {
           {submitting ? '登录中…' : '登录'}
         </button>
       </form>
-      <p>
+      <p className="auth-foot">
         还没有账号？<Link to="/register">去注册</Link>
       </p>
     </section>

@@ -18,4 +18,9 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // 后端是 Node 环境，浏览器那套全局变量不适用
+    files: ['backend/**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
 ])
