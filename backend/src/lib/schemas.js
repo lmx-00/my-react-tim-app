@@ -60,3 +60,8 @@ export const recordsQuerySchema = z.object({
   result: z.enum(['won', 'lost', 'quit', 'expired']).optional(),
   levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID).optional(),
 })
+
+export const leaderboardQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+})

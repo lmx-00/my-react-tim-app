@@ -422,7 +422,9 @@ export async function useShuffle(userId, sessionId) {
   return settleTool(userId, session, level, result, tools)
 }
 
-export async function listLeaderboard(userId) {
+// 星星总数存在 progress.levelStars 这个 JSON 里，数据库排不了序，
+// 只能全量拉回来在内存里排完再切页。
+export async function listLeaderboard(userId, { page = 1, pageSize = 50 } = {}) {
   const users = await prisma.user.findMany({ include: { progress: true } })
   const rows = users
     .map((user) => {
@@ -440,7 +442,15 @@ export async function listLeaderboard(userId) {
     .sort((a, b) => b.totalStars - a.totalStars || b.maxCleared - a.maxCleared)
     .map((row, index) => ({ rank: index + 1, ...row }))
 
-  return { items: rows.slice(0, 50) }
+  const start = (page - 1) * pageSize
+  return {
+    items: rows.slice(start, start + pageSize),
+    total: rows.length,
+    page,
+    pageSize,
+    // 自己掉出已加载的名次时，前端要单独把这一行钉在底部
+    me: rows.find((row) => row.me) ?? null,
+  }
 }
 
 export async function getThemeSetting() {

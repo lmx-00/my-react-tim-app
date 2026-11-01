@@ -2,27 +2,10 @@ const STORE_KEY = 'hm-sound'
 const MELODY = [523.25, 659.25, 783.99, 659.25, 880, 783.99, 659.25, 587.33]
 const BEAT = 0.52
 
-// siteSound 是后台的全局开关，personal 是玩家自己在「我的」里的选择，后者优先。
-// 默认关闭：后台设置拉回来之前先当作静音，免得刚进页面就去撞浏览器的自动播放拦截。
+// 音效只由后台的全站开关决定。默认先静音，等设置拉回来再播。
 let siteSound = false
-let personal = readPersonal()
-
-function readPersonal() {
-  try {
-    return localStorage.getItem(STORE_KEY)
-  } catch {
-    // 隐私模式下读不到，按跟随后台处理
-    return null
-  }
-}
-
-export function personalSound() {
-  return personal
-}
 
 export function soundEnabled() {
-  if (personal === '0') return false
-  if (personal === '1') return true
   return siteSound
 }
 
@@ -128,7 +111,6 @@ function bindGesture() {
   }
   const onGesture = (event) => {
     const target = event.target
-    if (target instanceof Element && target.closest('.account-row')) return
     if (!soundEnabled()) return
     startBgm()
   }
@@ -150,16 +132,10 @@ sync()
 
 export function setSiteSound(enabled) {
   siteSound = enabled !== false
-  sync()
-}
-
-export function setPersonalSound(value) {
-  personal = value == null ? null : value ? '1' : '0'
   try {
-    if (personal == null) localStorage.removeItem(STORE_KEY)
-    else localStorage.setItem(STORE_KEY, personal)
+    localStorage.removeItem(STORE_KEY)
   } catch {
-    // 写不进去也认，至少这次会话内是对的
+    // 旧的个人开关清不掉也没关系，播放已经不再读它
   }
   sync()
 }

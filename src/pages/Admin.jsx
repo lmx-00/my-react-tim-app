@@ -93,7 +93,7 @@ export function AdminPage() {
               checked={form.sound}
               onChange={(event) => patch({ sound: event.target.checked })}
             />
-            全站默认打开音效。不勾选则默认静音，玩家可以在「我的」里自己打开。
+            打开后全站播放音效和背景音乐。保存后生效。
           </label>
         </fieldset>
 

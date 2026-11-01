@@ -279,7 +279,7 @@ p {
 .brand {
   font-weight: 800;
   font-size: 18px;
-  color: var(--leaf-dark);
+  color: var(--grass-dark);
   text-decoration: none;
   letter-spacing: 0.5px;
 }
@@ -1693,6 +1693,20 @@ p {
   font-size: 13px;
 }
 
+/* 自己的名次钉在底部时，用这一行表示中间还隔着别人 */
+.rank-list li.rank-gap {
+  display: block;
+  padding: 2px 0;
+  background: none;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 6px;
+}
+
+.rank-foot {
+  text-align: center;
+}
+
 .account-card {
   display: flex;
   flex-direction: column;
@@ -1729,6 +1743,11 @@ p {
 .account-card .btn {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+.account-card > :first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .account-link {
@@ -1961,6 +1980,10 @@ html[data-theme='forest'] .rank-list li.is-2 {
 
 html[data-theme='forest'] .rank-list li.is-3 {
   background: linear-gradient(90deg, #fff1e6, #f4fbff);
+}
+
+html[data-theme='forest'] .brand {
+  color: var(--leaf-dark);
 }
 
 html[data-theme='forest'] .vine-leaf {

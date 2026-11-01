@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
-import { settingsSchema } from '../lib/schemas.js'
+import { leaderboardQuerySchema, settingsSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { adminRequired, authRequired } from '../middleware/auth.js'
 import { getSiteSettings, listLeaderboard, setSiteSettings } from '../services/gameService.js'
@@ -18,7 +18,8 @@ metaRouter.get(
   '/leaderboard',
   authRequired,
   asyncHandler(async (req, res) => {
-    ok(res, await listLeaderboard(req.user.id))
+    const query = parseWith(leaderboardQuerySchema, req.query)
+    ok(res, await listLeaderboard(req.user.id, query))
   }),
 )
 

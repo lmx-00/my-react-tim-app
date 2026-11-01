@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getStats, listLevels } from '../api/game.js'
 import { useAuth } from '../auth/useAuth.js'
-import { setPersonalSound, soundEnabled } from '../game/sound.js'
 
 function formatJoined(value) {
   if (!value) return ''
@@ -18,7 +17,6 @@ export function ProfilePage() {
   const [totalLevels, setTotalLevels] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [soundOn, setSoundOn] = useState(soundEnabled())
 
   useEffect(() => {
     let cancelled = false
@@ -38,12 +36,6 @@ export function ProfilePage() {
       cancelled = true
     }
   }, [])
-
-  function toggleSound() {
-    const next = !soundEnabled()
-    setPersonalSound(next)
-    setSoundOn(next)
-  }
 
   async function handleLogout() {
     await logout()
@@ -133,15 +125,6 @@ export function ProfilePage() {
       ) : null}
 
       <div className="account-card">
-        <button type="button" className="account-row" aria-pressed={soundOn} onClick={toggleSound}>
-          <div>
-            <strong>音效</strong>
-            <p className="muted">{soundOn ? '已打开' : '已关闭'}</p>
-          </div>
-          <span className={`switch${soundOn ? ' is-on' : ''}`} aria-hidden="true">
-            <span />
-          </span>
-        </button>
         <Link className="account-link" to="/profile/password">
           <span>修改密码</span>
           <span aria-hidden="true">›</span>

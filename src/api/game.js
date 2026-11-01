@@ -47,8 +47,8 @@ export function useShuffle(sessionId) {
   return api(`/game/sessions/${sessionId}/shuffle`, { method: 'POST' })
 }
 
-export function getLeaderboard() {
-  return api('/leaderboard')
+export function getLeaderboard({ page = 1, pageSize = 50 } = {}) {
+  return api(`/leaderboard?${new URLSearchParams({ page, pageSize })}`)
 }
 
 export function getTheme() {
