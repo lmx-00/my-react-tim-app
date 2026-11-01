@@ -22,4 +22,8 @@ export const config = {
   cookieSameSite: process.env.COOKIE_SAMESITE ?? 'lax',
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProd,
+  adminUsernames: (process.env.ADMIN_USERNAMES ?? 'dev')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean),
 }

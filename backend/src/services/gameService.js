@@ -1,5 +1,7 @@
 import { SESSION_TIMEOUT_MS } from '../game/constants.js'
 import {
+  applyHammer,
+  applyShuffleTool,
   applySwap,
   createBoard,
 } from '../game/engine.js'
@@ -130,7 +132,34 @@ function serializeSession(session, level) {
     status: session.status,
     stars: session.stars,
     startedAt: session.startedAt,
+    canUndo: Array.isArray(session.history) && session.history.length > 0,
+    tools: normalizeTools(session.tools),
   }
+}
+
+function normalizeTools(tools) {
+  return {
+    hammer: Number(tools?.hammer ?? 3),
+    shuffle: Number(tools?.shuffle ?? 1),
+  }
+}
+
+function snapshot(session) {
+  return {
+    board: session.board,
+    rngState: session.rngState,
+    score: session.score,
+    movesLeft: session.movesLeft,
+    moveCount: session.moveCount,
+    collected: session.collected ?? {},
+    goalProgress: session.goalProgress,
+    tools: normalizeTools(session.tools),
+  }
+}
+
+function pushHistory(session) {
+  const history = Array.isArray(session.history) ? session.history : []
+  return [...history, snapshot(session)].slice(-20)
 }
 
 async function loadOwnedSession(userId, sessionId) {
@@ -202,6 +231,7 @@ export async function createSession(userId, levelId) {
   const rng = rngFromState(seed)
   const config = getLevelConfig(level.id)
   const board = createBoard(config, rng)
+  const settings = await getSiteSettings()
 
   const session = await prisma.gameSession.create({
     data: {
@@ -211,6 +241,7 @@ export async function createSession(userId, levelId) {
       rngState: rng.getState(),
       movesLeft: level.moveLimit,
       goalProgress: emptyGoalProgress(level),
+      tools: { hammer: settings.hammer, shuffle: settings.shuffle },
     },
   })
 
@@ -279,6 +310,7 @@ export async function playMove(userId, sessionId, move) {
       collected,
       goalProgress,
       lastMoveAt: new Date(),
+      history: pushHistory(session),
       ...(finish ?? {}),
     },
   })
@@ -296,7 +328,174 @@ export async function playMove(userId, sessionId, move) {
     goalProgress: updated.goalProgress,
     status: updated.status,
     stars: updated.stars,
+    canUndo: true,
+    tools: normalizeTools(updated.tools),
   }
+}
+
+export async function undoMove(userId, sessionId) {
+  const settings = await getSiteSettings()
+  if (!settings.undo) throw new AppError(409, 'UNDO_DISABLED', '后台已关闭后退')
+  const session = await loadOwnedSession(userId, sessionId)
+  if (session.status !== 'playing') {
+    throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
+  }
+  const history = Array.isArray(session.history) ? session.history : []
+  const previous = history.at(-1)
+  if (!previous) throw new AppError(409, 'NO_UNDO', '没有可以后退的步骤')
+
+  const updated = await prisma.gameSession.update({
+    where: { id: session.id },
+    data: {
+      board: previous.board,
+      rngState: previous.rngState,
+      score: previous.score,
+      movesLeft: previous.movesLeft,
+      moveCount: previous.moveCount,
+      collected: previous.collected ?? {},
+      goalProgress: previous.goalProgress,
+      tools: previous.tools ?? normalizeTools(session.tools),
+      history: history.slice(0, -1),
+      lastMoveAt: new Date(),
+    },
+  })
+  const level = await prisma.level.findUnique({ where: { id: session.levelId } })
+  return serializeSession(updated, level)
+}
+
+async function spendTool(session, tool) {
+  const tools = normalizeTools(session.tools)
+  if (tools[tool] <= 0) throw new AppError(409, 'NO_TOOL', '这个道具已经用完了')
+  tools[tool] -= 1
+  return tools
+}
+
+async function settleTool(userId, session, level, result, tools) {
+  const collected = { ...(session.collected ?? {}) }
+  for (const [type, count] of Object.entries(result.collected ?? {})) {
+    collected[type] = (collected[type] ?? 0) + count
+  }
+  const score = session.score + (result.scoreDelta ?? 0)
+  const goalProgress = buildGoalProgress(level, score, collected)
+  const won = isGoalMet(level, score, collected)
+  const finish = won ? finishSession({ ...session, movesLeft: session.movesLeft, score }, 'won', level) : null
+  const updated = await prisma.gameSession.update({
+    where: { id: session.id },
+    data: {
+      board: result.board,
+      rngState: result.rngState,
+      score,
+      collected,
+      goalProgress,
+      tools,
+      history: pushHistory(session),
+      lastMoveAt: new Date(),
+      ...(finish ?? {}),
+    },
+  })
+  if (finish?.status === 'won') await updateProgressOnWin(userId, level, updated)
+  return { ...serializeSession(updated, level), events: result.events, valid: true }
+}
+
+export async function useHammer(userId, sessionId, point) {
+  const session = await loadOwnedSession(userId, sessionId)
+  if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
+  const tools = await spendTool(session, 'hammer')
+  const level = await prisma.level.findUnique({ where: { id: session.levelId } })
+  const config = getLevelConfig(level.id)
+  const rng = rngFromState(session.rngState)
+  const result = applyHammer(session.board, point, config, rng)
+  if (!result.valid) throw new AppError(400, 'INVALID_TOOL', '这里不能敲')
+  result.rngState = rng.getState()
+  return settleTool(userId, session, level, result, tools)
+}
+
+export async function useShuffle(userId, sessionId) {
+  const session = await loadOwnedSession(userId, sessionId)
+  if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
+  const tools = await spendTool(session, 'shuffle')
+  const level = await prisma.level.findUnique({ where: { id: session.levelId } })
+  const config = getLevelConfig(level.id)
+  const rng = rngFromState(session.rngState)
+  const result = applyShuffleTool(session.board, config, rng)
+  result.rngState = rng.getState()
+  return settleTool(userId, session, level, result, tools)
+}
+
+export async function listLeaderboard(userId) {
+  const users = await prisma.user.findMany({ include: { progress: true } })
+  const rows = users
+    .map((user) => {
+      const stars = Object.values(user.progress?.levelStars ?? {}).reduce(
+        (sum, value) => sum + Number(value ?? 0),
+        0,
+      )
+      return {
+        username: user.username,
+        maxCleared: user.progress?.maxCleared ?? 0,
+        totalStars: stars,
+        me: user.id === userId,
+      }
+    })
+    .sort((a, b) => b.totalStars - a.totalStars || b.maxCleared - a.maxCleared)
+    .map((row, index) => ({ rank: index + 1, ...row }))
+
+  return { items: rows.slice(0, 50) }
+}
+
+export async function getThemeSetting() {
+  return getSiteSettings()
+}
+
+const SITE_DEFAULTS = { sound: false, undo: true, hammer: 3, shuffle: 1 }
+
+export async function getSiteSettings() {
+  const [themeRow, siteRow] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: 'theme' } }),
+    prisma.setting.findUnique({ where: { key: 'site' } }),
+  ])
+  const site = siteRow?.value ?? {}
+  return {
+    theme: themeRow?.value?.name === 'forest' ? 'forest' : 'candy',
+    sound: site.sound !== false,
+    undo: site.undo !== false,
+    hammer: clampCount(site.hammer, SITE_DEFAULTS.hammer),
+    shuffle: clampCount(site.shuffle, SITE_DEFAULTS.shuffle),
+  }
+}
+
+function clampCount(value, fallback) {
+  const number = Number(value)
+  if (!Number.isInteger(number)) return fallback
+  return Math.min(9, Math.max(0, number))
+}
+
+export async function setSiteSettings(input) {
+  const current = await getSiteSettings()
+  const next = {
+    theme: input.theme === 'forest' || input.theme === 'candy' ? input.theme : current.theme,
+    sound: typeof input.sound === 'boolean' ? input.sound : current.sound,
+    undo: typeof input.undo === 'boolean' ? input.undo : current.undo,
+    hammer: input.hammer == null ? current.hammer : clampCount(input.hammer, current.hammer),
+    shuffle: input.shuffle == null ? current.shuffle : clampCount(input.shuffle, current.shuffle),
+  }
+  await prisma.$transaction([
+    prisma.setting.upsert({
+      where: { key: 'theme' },
+      update: { value: { name: next.theme } },
+      create: { key: 'theme', value: { name: next.theme } },
+    }),
+    prisma.setting.upsert({
+      where: { key: 'site' },
+      update: { value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle } },
+      create: { key: 'site', value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle } },
+    }),
+  ])
+  return next
+}
+
+export async function setThemeSetting(name) {
+  return setSiteSettings({ theme: name })
 }
 
 export async function quitSession(userId, sessionId) {

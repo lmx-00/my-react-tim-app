@@ -11,12 +11,14 @@ model User {
   id           String         @id @default(uuid())
   username     String         @unique
   passwordHash String
+  avatarUrl    String?
   createdAt    DateTime       @default(now())
   failedLogins Int            @default(0)
   lockedUntil  DateTime?
   progress     UserProgress?
   sessions     GameSession[]
   refreshTokens RefreshToken[]
+  role         String         @default("player")
 }
 
 model RefreshToken {
@@ -71,8 +73,15 @@ model GameSession {
   lastMoveAt   DateTime  @default(now())
   endedAt      DateTime?
   durationMs   Int?
+  history      Json      @default("[]")
+  tools        Json      @default("{\"hammer\":3,\"shuffle\":1}")
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([userId, endedAt])
+}
+
+model Setting {
+  key   String @id
+  value Json
 }

@@ -100,20 +100,83 @@ describe('match-3 engine', () => {
     assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 2)
   })
 
-  it('detonates a 3x3 when swapping a rainbow with any neighbor', () => {
+  it('creates a rainbow bird from a straight 5-match', () => {
     const board = boardFrom([
-      ['bear', 'cat', 'fox', 'frog'],
-      ['cat', 'rainbow', 'frog', 'owl'],
-      ['fox', 'owl', 'cat', 'frog'],
-      ['owl', 'frog', 'fox', 'cat'],
+      ['bear', 'bear', 'bear', 'bear', 'cat'],
+      ['fox', 'owl', 'frog', 'chick', 'bear'],
+      ['owl', 'frog', 'chick', 'fox', 'cat'],
+      ['frog', 'chick', 'fox', 'owl', 'fox'],
+      ['chick', 'fox', 'owl', 'frog', 'owl'],
     ])
-    const rng = createRng(1)
-    const result = applySwap(board, { x1: 1, y1: 1, x2: 0, y2: 1 }, { colorCount: 6 }, rng)
+    const result = applySwap(board, { x1: 4, y1: 0, x2: 4, y2: 1 }, { colorCount: 6 }, createRng(3))
+    assert.equal(result.valid, true)
+    const spawn = result.events.find((event) => event.type === 'spawnSpecial')
+    assert.ok(spawn)
+    assert.equal(spawn.tiles[0].tile.type, 'rainbow')
+  })
+
+  it('creates a bomb from an L or T match', () => {
+    const board = boardFrom([
+      ['bear', 'fox', 'bear', 'bear'],
+      ['cat', 'bear', 'chick', 'frog'],
+      ['owl', 'bear', 'owl', 'chick'],
+      ['frog', 'cat', 'fox', 'owl'],
+    ])
+    const result = applySwap(board, { x1: 0, y1: 0, x2: 1, y2: 0 }, { colorCount: 6 }, createRng(5))
+    assert.equal(result.valid, true)
+    const spawn = result.events.find((event) => event.type === 'spawnSpecial')
+    assert.ok(spawn)
+    assert.equal(spawn.tiles[0].tile.type, 'bomb')
+  })
+
+  it('fires a column rocket when swapped beside any tile', () => {
+    const board = boardFrom([
+      ['fox', 'owl', 'chick', 'frog'],
+      ['owl', 'frog', 'fox', 'chick'],
+      ['bear', { type: 'rocket', dir: 'col', color: 'cat' }, 'owl', 'fox'],
+      ['chick', 'bear', 'frog', 'owl'],
+    ])
+    const result = applySwap(board, { x1: 1, y1: 2, x2: 0, y2: 2 }, { colorCount: 6 }, createRng(1))
+    assert.equal(result.valid, true)
+    const match = result.events.find((event) => event.type === 'match')
+    const keys = new Set(match.cells.map(([y, x]) => `${y},${x}`))
+    assert.equal(match.effect, 'line')
+    for (const key of ['0,0', '1,0', '2,0', '3,0']) assert.equal(keys.has(key), true, key)
+    assert.equal(keys.has('0,1'), false)
+  })
+
+  it('clears the whole row when a row rocket is matched', () => {
+    const board = boardFrom([
+      ['bear', { type: 'rocket', dir: 'row', color: 'bear' }, 'cat', 'fox'],
+      ['owl', 'frog', 'bear', 'chick'],
+      ['chick', 'owl', 'fox', 'frog'],
+      ['frog', 'chick', 'owl', 'fox'],
+    ])
+    const result = applySwap(board, { x1: 2, y1: 0, x2: 2, y2: 1 }, { colorCount: 6 }, createRng(1))
+    const match = result.events.find((event) => event.type === 'match')
+    const keys = new Set(match.cells.map(([y, x]) => `${y},${x}`))
+    assert.equal(match.effect, 'line')
+    assert.equal(keys.has('0,3'), true)
+    assert.equal(keys.has('0,0'), true)
+  })
+
+  it('clears every tile of the swapped color when a rainbow is used', () => {
+    const board = boardFrom([
+      ['cat', 'fox', 'cat', 'frog'],
+      ['owl', 'rainbow', 'frog', 'owl'],
+      ['fox', 'chick', 'cat', 'frog'],
+      ['owl', 'frog', 'fox', 'chick'],
+    ])
+    const result = applySwap(board, { x1: 1, y1: 1, x2: 1, y2: 0 }, { colorCount: 6 }, createRng(1))
     assert.equal(result.valid, true)
     const blast = result.events.find((event) => event.type === 'rainbow')
-    assert.ok(blast)
-    assert.ok(blast.cells.length >= 6)
-    assert.ok(result.scoreDelta > 0)
+    assert.equal(blast.color, 'fox')
+    assert.equal(blast.effect, 'color')
+    const keys = new Set(blast.cells.map(([y, x]) => `${y},${x}`))
+    for (const key of ['0,1', '2,0', '3,2', '1,1']) {
+      assert.equal(keys.has(key), true, key)
+    }
+    assert.equal(keys.has('0,0'), false)
   })
 
   it('keeps the original board intact on invalid moves', () => {

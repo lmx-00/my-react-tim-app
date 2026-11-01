@@ -2,6 +2,17 @@ import { app } from './app.js'
 import { config } from './config.js'
 import { prisma } from './lib/prisma.js'
 
+if (config.adminUsernames.length) {
+  prisma.user
+    .updateMany({
+      where: { username: { in: config.adminUsernames } },
+      data: { role: 'admin' },
+    })
+    .catch((err) => {
+      console.error('设置管理员失败', err)
+    })
+}
+
 const server = app.listen(config.port, () => {
   console.log(`开心消消乐 API 已启动: http://localhost:${config.port}`)
 })

@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { refreshCookieOptions } from '../lib/jwt.js'
-import { loginSchema, registerSchema } from '../lib/schemas.js'
+import { loginSchema, passwordChangeSchema, registerSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
+import { authRequired } from '../middleware/auth.js'
 import {
+  changePassword,
   issueAuth,
   loginUser,
   logoutRefreshToken,
@@ -39,6 +41,15 @@ authRouter.post(
     const user = await rotateRefreshToken(req.cookies.refreshToken)
     const data = await issueAuth(res, user)
     ok(res, data)
+  }),
+)
+
+authRouter.post(
+  '/password',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(passwordChangeSchema, req.body)
+    ok(res, await changePassword(req.user.id, body))
   }),
 )
 

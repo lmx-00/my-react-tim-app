@@ -1,4 +1,4 @@
-export const LEVELS = [
+const CRAFTED = [
   { id: 1, name: '初入森林', rows: 8, cols: 8, colorCount: 6, moveLimit: 20, goalType: 'score', goalPayload: { score: 1450 }, twoStarMoves: 6, threeStarMoves: 9 },
   { id: 2, name: '小试牛刀', rows: 8, cols: 8, colorCount: 6, moveLimit: 24, goalType: 'score', goalPayload: { score: 2050 }, twoStarMoves: 7, threeStarMoves: 12 },
   { id: 3, name: '收集小熊', rows: 8, cols: 8, colorCount: 6, moveLimit: 20, goalType: 'collect', goalPayload: { bear: 10 }, twoStarMoves: 7, threeStarMoves: 12 },
@@ -31,10 +31,102 @@ export const LEVELS = [
   { id: 30, name: '最终挑战', rows: 8, cols: 9, colorCount: 6, moveLimit: 18, goalType: 'score', goalPayload: { score: 2250 }, twoStarMoves: 3, threeStarMoves: 8 },
 ]
 
-export const MAX_LEVEL_ID = Math.max(...LEVELS.map((level) => level.id))
+export const CHAPTER_SIZE = 20
+export const LEVEL_COUNT = 1000
+
+const ANIMALS = ['bear', 'cat', 'fox', 'frog', 'chick', 'owl']
+const CHAPTERS = [
+  '森林', '溪谷', '花园', '果园', '雪山', '沙漠', '海边', '星空',
+  '城堡', '迷宫', '云端', '熔岩', '竹林', '月夜', '彩虹', '龙巢',
+]
+const SPOTS = [
+  '小径', '木桥', '花田', '泉眼', '石阶', '树屋', '风车', '灯塔',
+  '码头', '洞窟', '草原', '瀑布', '钟楼', '集市', '温室', '驿站',
+  '浅滩', '哨所', '果岭', '终点',
+]
+
+function otherAnimal(id, first) {
+  const next = ANIMALS[(id + 2) % ANIMALS.length]
+  return next === first ? ANIMALS[(id + 3) % ANIMALS.length] : next
+}
+
+function buildLevel(id) {
+  const chapter = Math.floor((id - 1) / CHAPTER_SIZE)
+  const spot = (id - 1) % CHAPTER_SIZE
+  const theme = CHAPTERS[chapter % CHAPTERS.length]
+  const round = Math.floor(chapter / CHAPTERS.length) + 1
+  const breath = spot % 5 === 4
+  const boss = spot === CHAPTER_SIZE - 1
+  const wide = boss || spot % 7 === 6
+  const small = !wide && spot % 11 === 10
+
+  let rows = 8
+  let cols = 8
+  if (small) {
+    rows = 7
+    cols = 7
+  } else if (wide && id > 200) {
+    cols = 9
+  }
+  if (boss && id > 600) {
+    rows = 9
+    cols = 9
+  }
+
+  const animal = ANIMALS[id % ANIMALS.length]
+  const extra = Math.min(6, Math.floor(id / 160))
+  const pattern = id % 4
+  let goalType = 'score'
+  let goalPayload = { score: 1600 }
+  let moveLimit = breath ? 24 : boss ? 20 : 22
+
+  if (pattern === 1 || pattern === 3) {
+    goalType = 'collect'
+    const count = Math.min(16, (breath ? 8 : 10) + extra + (boss ? 2 : 0))
+    if (pattern === 3) {
+      const each = Math.max(6, count - 4)
+      goalPayload = { [animal]: each, [otherAnimal(id, animal)]: each }
+      moveLimit += 2
+    } else {
+      goalPayload = { [animal]: count }
+    }
+  } else {
+    const score = Math.min(2800, 1500 + Math.floor(id / 10) * 12 + (boss ? 180 : 0) - (breath ? 220 : 0))
+    goalPayload = { score: Math.max(1300, score) }
+  }
+
+  if (cols >= 9 || rows >= 9) moveLimit += 2
+  moveLimit = Math.max(16, moveLimit - Math.min(4, Math.floor((id - 30) / 250)))
+
+  const threeStarMoves = Math.max(4, Math.round(moveLimit * 0.38))
+  const twoStarMoves = Math.max(2, Math.min(threeStarMoves - 2, Math.round(moveLimit * 0.2)))
+  const prefix = round === 1 ? theme : `${theme}${round}`
+
+  return {
+    id,
+    name: `${prefix}${SPOTS[spot]}`,
+    rows,
+    cols,
+    colorCount: 6,
+    moveLimit,
+    goalType,
+    goalPayload,
+    twoStarMoves,
+    threeStarMoves,
+  }
+}
+
+export const LEVELS = Array.from({ length: LEVEL_COUNT }, (_, index) => {
+  const id = index + 1
+  return id <= CRAFTED.length ? CRAFTED[index] : buildLevel(id)
+})
+
+const BY_ID = new Map(LEVELS.map((level) => [level.id, level]))
+
+export const MAX_LEVEL_ID = LEVEL_COUNT
 
 export function getLevelConfig(id) {
-  return LEVELS.find((level) => level.id === Number(id)) ?? null
+  return BY_ID.get(Number(id)) ?? null
 }
 
 export function emptyGoalProgress(level) {

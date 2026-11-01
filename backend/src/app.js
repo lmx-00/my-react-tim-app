@@ -7,6 +7,7 @@ import { authRouter } from './routes/auth.js'
 import { gameRouter } from './routes/game.js'
 import { levelsRouter } from './routes/levels.js'
 import { meRouter } from './routes/me.js'
+import { metaRouter } from './routes/meta.js'
 import { recordsRouter } from './routes/records.js'
 
 export const app = express()
@@ -29,6 +30,7 @@ app.use('/api', meRouter)
 app.use('/api/levels', levelsRouter)
 app.use('/api/game', gameRouter)
 app.use('/api/records', recordsRouter)
+app.use('/api', metaRouter)
 
 app.use((req, res) => {
   res.status(404).json({

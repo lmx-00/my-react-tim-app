@@ -6,7 +6,13 @@ import { prisma } from '../lib/prisma.js'
 import { createRefreshTokenValue, hashToken } from '../lib/tokens.js'
 
 function publicUser(user) {
-  return { id: user.id, username: user.username, createdAt: user.createdAt }
+  return {
+    id: user.id,
+    username: user.username,
+    createdAt: user.createdAt,
+    role: user.role ?? 'player',
+    avatarUrl: user.avatarUrl ?? null,
+  }
 }
 
 export async function issueAuth(res, user) {
@@ -113,6 +119,35 @@ export async function logoutRefreshToken(refreshValue) {
   })
 }
 
+export async function changePassword(userId, { oldPassword, newPassword }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) throw new AppError(401, 'UNAUTHORIZED', '请先登录')
+  const good = await verifyPassword(oldPassword, user.passwordHash)
+  if (!good) throw new AppError(401, 'INVALID_CREDENTIALS', '当前密码不正确')
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: await hashPassword(newPassword) },
+  })
+  return { success: true }
+}
+
+export async function updateAvatar(userId, avatarUrl) {
+  let parsed
+  try {
+    parsed = new URL(avatarUrl)
+  } catch {
+    throw new AppError(400, 'INVALID_AVATAR', '头像地址不正确')
+  }
+  if (parsed.protocol !== 'https:' || avatarUrl.length > 500) {
+    throw new AppError(400, 'INVALID_AVATAR', '头像地址不正确')
+  }
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl },
+  })
+  return publicUser(user)
+}
+
 export async function getMe(userId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -139,6 +174,7 @@ export async function getMe(userId) {
   return {
     id: user.id,
     username: user.username,
+    avatarUrl: user.avatarUrl ?? null,
     createdAt: user.createdAt,
     progress: {
       maxCleared: user.progress?.maxCleared ?? 0,

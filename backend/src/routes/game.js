@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
-import { createSessionSchema, moveSchema } from '../lib/schemas.js'
+import { createSessionSchema, hammerSchema, moveSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { authRequired } from '../middleware/auth.js'
 import {
@@ -8,6 +8,9 @@ import {
   getSession,
   playMove,
   quitSession,
+  undoMove,
+  useHammer,
+  useShuffle,
 } from '../services/gameService.js'
 
 export const gameRouter = Router()
@@ -43,5 +46,30 @@ gameRouter.post(
   authRequired,
   asyncHandler(async (req, res) => {
     ok(res, await quitSession(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/undo',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await undoMove(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/hammer',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const point = parseWith(hammerSchema, req.body)
+    ok(res, await useHammer(req.user.id, req.params.id, point))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/shuffle',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await useShuffle(req.user.id, req.params.id))
   }),
 )

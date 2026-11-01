@@ -31,6 +31,29 @@ export const moveSchema = z.object({
   y2: z.coerce.number().int(),
 })
 
+export const hammerSchema = z.object({
+  x: z.coerce.number().int(),
+  y: z.coerce.number().int(),
+})
+
+export const settingsSchema = z.object({
+  theme: z.enum(['candy', 'forest']).optional(),
+  sound: z.boolean().optional(),
+  undo: z.boolean().optional(),
+  hammer: z.coerce.number().int().min(0).max(9).optional(),
+  shuffle: z.coerce.number().int().min(0).max(9).optional(),
+})
+
+export const passwordChangeSchema = z.object({
+  oldPassword: z.string().min(1, '请输入当前密码'),
+  newPassword: z
+    .string()
+    .min(8, '密码长度需为 8–32 个字符')
+    .max(32, '密码长度需为 8–32 个字符')
+    .regex(/[A-Za-z]/, '密码需同时包含字母和数字')
+    .regex(/[0-9]/, '密码需同时包含字母和数字'),
+})
+
 export const recordsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),

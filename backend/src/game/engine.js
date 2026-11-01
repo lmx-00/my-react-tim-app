@@ -76,12 +76,16 @@ function isRainbowSwap(a, b) {
   return a?.type === 'rainbow' || b?.type === 'rainbow'
 }
 
+function isPowerSwap(a, b) {
+  return a?.type === 'rocket' || b?.type === 'rocket' || a?.type === 'bomb' || b?.type === 'bomb'
+}
+
 function wouldMatch(board, y1, x1, y2, x2) {
   const next = cloneBoard(board)
   swapCells(next, y1, x1, y2, x2)
   const a = next.cells[y1][x1]
   const b = next.cells[y2][x2]
-  if (isRainbowSwap(a, b)) return true
+  if (isRainbowSwap(a, b) || isPowerSwap(a, b)) return true
   return hasMatch(next)
 }
 
@@ -135,7 +139,8 @@ function specialFromRuns(board, key, horizontal, vertical) {
   const hLen = horizontal.get(key) ?? 0
   const vLen = vertical.get(key) ?? 0
   const color = matchColor(tile)
-  if (hLen >= 5 || vLen >= 5) return { type: 'bomb', color }
+  // 开心消消乐：直线五连是彩虹鸟，拐角是炸弹，直线四连是火箭
+  if (hLen >= 5 || vLen >= 5) return { type: 'rainbow' }
   if (hLen >= 3 && vLen >= 3) return { type: 'bomb', color }
   if (hLen >= 4) return { type: 'rocket', dir: 'row', color }
   if (vLen >= 4) return { type: 'rocket', dir: 'col', color }
@@ -208,7 +213,7 @@ function collectBlast(board, startCells, rainbowColor) {
       } else {
         for (let r = 0; r < board.rows; r += 1) queue.push({ row: r, col, reason: 'rocket' })
       }
-    } else if (tile.type === 'bomb' || tile.type === 'rainbow') {
+    } else if (tile.type === 'bomb') {
       activated.add(key)
       for (let dr = -RAINBOW_BLAST_RADIUS; dr <= RAINBOW_BLAST_RADIUS; dr += 1) {
         for (let dc = -RAINBOW_BLAST_RADIUS; dc <= RAINBOW_BLAST_RADIUS; dc += 1) {
@@ -323,9 +328,10 @@ function resolveWaves(board, rng, colorCount, swapCells) {
 
     events.push({
       type: 'match',
-      cells: matchedCells,
+      cells: [...toClear].map(parseKey),
       wave,
       score: waveScore,
+      effect: waveEffect(extraScores),
     })
     if (Object.keys(spawns).length) {
       events.push({
@@ -351,32 +357,80 @@ function resolveWaves(board, rng, colorCount, swapCells) {
   return { events, scoreDelta, collected, waves: wave - 1 }
 }
 
-function blastRadiusCells(row, col, radius) {
-  const cells = []
-  for (let dr = -radius; dr <= radius; dr += 1) {
-    for (let dc = -radius; dc <= radius; dc += 1) {
-      cells.push([row + dr, col + dc])
-    }
+function waveEffect(extraScores) {
+  if (extraScores.rainbow > 0) return 'color'
+  if (extraScores.bomb > 0) return 'bomb'
+  if (extraScores.rocket > 0) return 'line'
+  return 'match'
+}
+
+function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
+  const start = []
+  for (const [y, x] of [[y1, x1], [y2, x2]]) {
+    const tile = board.cells[y][x]
+    if (tile?.type === 'rocket' || tile?.type === 'bomb') start.push([y, x])
   }
-  return cells
+  const { toClear, extraScores } = collectBlast(board, start, null)
+  const collected = {}
+  tallyCleared(board, toClear, collected)
+  const waveScore = Math.round(
+    (extraScores.rocket + extraScores.bomb + extraScores.rainbow) * comboMultiplier(1),
+  )
+  const events = [
+    {
+      type: 'match',
+      cells: [...toClear].map(parseKey),
+      wave: 1,
+      score: waveScore,
+      effect: waveEffect(extraScores),
+    },
+  ]
+
+  applyClears(board, toClear, {})
+  const drops = applyGravity(board)
+  if (drops.length) events.push({ type: 'drop', moves: drops })
+  const fills = fillBoard(board, rng, colorCount)
+  if (fills.length) events.push({ type: 'fill', cells: fills })
+
+  const rest = resolveWaves(board, rng, colorCount, null)
+  mergeCollected(collected, rest.collected)
+
+  return {
+    events: [...events, ...rest.events],
+    scoreDelta: waveScore + rest.scoreDelta,
+    collected,
+  }
 }
 
 function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
   const a = board.cells[y1][x1]
-  const rainbowPos = a.type === 'rainbow' ? [y1, x1] : [y2, x2]
-  const start = blastRadiusCells(rainbowPos[0], rainbowPos[1], RAINBOW_BLAST_RADIUS)
-  const { toClear, extraScores } = collectBlast(board, start, null)
+  const other = a.type === 'rainbow' ? board.cells[y2][x2] : a
+  const color = matchColor(other)
+  const start = [
+    [y1, x1],
+    [y2, x2],
+  ]
+  if (!color) {
+    for (let row = 0; row < board.rows; row += 1) {
+      for (let col = 0; col < board.cols; col += 1) {
+        if (board.cells[row][col]) start.push([row, col])
+      }
+    }
+  }
+  const { toClear, extraScores } = collectBlast(board, start, color)
 
   const collected = {}
   tallyCleared(board, toClear, collected)
+  const colorScore = color ? extraScores.rainbow : toClear.size * SCORE.rainbow
   const waveScore = Math.round(
-    (SCORE.rainbow + extraScores.rocket + extraScores.bomb + extraScores.rainbow) * comboMultiplier(1),
+    (SCORE.rainbow + extraScores.rocket + extraScores.bomb + colorScore) * comboMultiplier(1),
   )
 
   const events = [
     {
       type: 'rainbow',
-      color: null,
+      color,
+      effect: 'color',
       cells: [...toClear].map(parseKey),
       wave: 1,
       score: waveScore,
@@ -537,6 +591,18 @@ export function applySwap(board, move, levelConfig, rng) {
     }
   }
 
+  if (isPowerSwap(a, b)) {
+    const result = resolvePowerSwap(next, rng, levelConfig.colorCount, y1, x1, y2, x2)
+    maybeShuffle(next, rng, levelConfig.colorCount, result.events)
+    return {
+      valid: true,
+      events: [...events, ...result.events],
+      board: next,
+      scoreDelta: result.scoreDelta,
+      collected: result.collected,
+    }
+  }
+
   if (!hasMatch(next)) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
@@ -566,4 +632,58 @@ export function ensurePlayable(board, rng, colorCount) {
   const events = []
   maybeShuffle(board, rng, colorCount, events)
   return events
+}
+
+export function applyHammer(board, point, levelConfig, rng) {
+  const { x, y } = point
+  if (!inBounds(board, y, x) || !board.cells[y]?.[x]) {
+    return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
+  }
+
+  const next = cloneBoard(board)
+  const { toClear, extraScores } = collectBlast(next, [[y, x]], null)
+  const collected = {}
+  tallyCleared(next, toClear, collected)
+  const waveScore = Math.round(extraScores.rocket + extraScores.bomb + extraScores.rainbow + toClear.size * 10)
+  const events = [
+    {
+      type: 'match',
+      cells: [...toClear].map(parseKey),
+      wave: 1,
+      score: waveScore,
+      effect: waveEffect(extraScores),
+    },
+  ]
+
+  applyClears(next, toClear, {})
+  const drops = applyGravity(next)
+  if (drops.length) events.push({ type: 'drop', moves: drops })
+  const fills = fillBoard(next, rng, levelConfig.colorCount)
+  if (fills.length) events.push({ type: 'fill', cells: fills })
+
+  const rest = resolveWaves(next, rng, levelConfig.colorCount, null)
+  for (const [type, count] of Object.entries(rest.collected)) {
+    collected[type] = (collected[type] ?? 0) + count
+  }
+  maybeShuffle(next, rng, levelConfig.colorCount, rest.events)
+
+  return {
+    valid: true,
+    events: [...events, ...rest.events],
+    board: next,
+    scoreDelta: waveScore + rest.scoreDelta,
+    collected,
+  }
+}
+
+export function applyShuffleTool(board, levelConfig, rng) {
+  const next = cloneBoard(board)
+  shuffleBoard(next, rng, levelConfig.colorCount)
+  return {
+    valid: true,
+    events: [{ type: 'shuffle', board: cloneBoard(next) }],
+    board: next,
+    scoreDelta: 0,
+    collected: {},
+  }
 }
