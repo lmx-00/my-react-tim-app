@@ -1,5 +1,12 @@
 const cellKey = (y, x) => `${y}-${x}`
 
+function specialBanner(tile) {
+  if (tile.type === 'rainbow') return '五连 · 彩虹鸟'
+  if (tile.type === 'bomb') return '拐角 · 炸弹'
+  if (tile.type === 'rocket') return tile.dir === 'row' ? '四连 · 横火箭' : '四连 · 竖火箭'
+  return ''
+}
+
 function cloneCells(cells) {
   return cells.map((row) => row.slice())
 }
@@ -45,6 +52,7 @@ export function buildFrames(startCells, events) {
           popping: event.cells.map(([y, x]) => cellKey(y, x)),
           wave: event.wave ?? 1,
           score: event.score ?? 0,
+          effect: event.effect ?? (event.type === 'rainbow' ? 'color' : 'match'),
         })
         for (const [y, x] of event.cells) {
           if (cells[y]) cells[y][x] = null
@@ -54,10 +62,25 @@ export function buildFrames(startCells, events) {
 
       case 'spawnSpecial': {
         falling ??= new Map()
+        const last = frames[frames.length - 1]
+        const banner = event.tiles.map((item) => specialBanner(item.tile)).filter(Boolean).join('  ')
+        if (last?.kind === 'pop' && banner) {
+          last.banner = banner
+          if (!last.effect || last.effect === 'match') {
+            const tile = event.tiles[0].tile
+            last.effect = tile.type === 'rainbow' ? 'color' : tile.type === 'bomb' ? 'bomb' : 'line'
+          }
+          const shown = new Set()
+          for (const item of event.tiles) {
+            const [y, x] = item.at
+            shown.add(cellKey(y, x))
+            if (last.cells[y]) last.cells[y][x] = item.tile
+          }
+          last.popping = last.popping.filter((key) => !shown.has(key))
+        }
         for (const item of event.tiles) {
           const [y, x] = item.at
           cells[y][x] = item.tile
-          spawning.add(cellKey(y, x))
         }
         break
       }

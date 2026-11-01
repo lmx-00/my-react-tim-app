@@ -35,6 +35,34 @@ export function quitSession(sessionId) {
   return api(`/game/sessions/${sessionId}/quit`, { method: 'POST' })
 }
 
+export function undoMove(sessionId) {
+  return api(`/game/sessions/${sessionId}/undo`, { method: 'POST' })
+}
+
+export function useHammer(sessionId, point) {
+  return api(`/game/sessions/${sessionId}/hammer`, { method: 'POST', body: point })
+}
+
+export function useShuffle(sessionId) {
+  return api(`/game/sessions/${sessionId}/shuffle`, { method: 'POST' })
+}
+
+export function getLeaderboard() {
+  return api('/leaderboard')
+}
+
+export function getTheme() {
+  return api('/settings')
+}
+
+export function saveSettings(settings) {
+  return api('/admin/settings', { method: 'PUT', body: settings })
+}
+
+export function saveTheme(theme) {
+  return saveSettings({ theme })
+}
+
 export function getStats() {
   return api('/stats')
 }

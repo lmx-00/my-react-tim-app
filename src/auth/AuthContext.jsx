@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { loginRequest, logoutRequest, registerRequest } from '../api/auth.js'
+import { loginRequest, logoutRequest, registerRequest, saveAvatarRequest } from '../api/auth.js'
 import { onAuthChange, refreshAuth, setAuthToken } from '../api/client.js'
 import { AuthContext } from './useAuth.js'
 
@@ -73,6 +73,11 @@ export function AuthProvider({ children }) {
           // Cookie 失效时也清本地状态
         }
         clearAuth()
+      },
+      async saveAvatar(avatarUrl) {
+        const data = await saveAvatarRequest(avatarUrl)
+        setUser((current) => (current ? { ...current, avatarUrl: data.avatarUrl } : current))
+        return data
       },
     }),
     [user, accessToken, ready],

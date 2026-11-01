@@ -11,7 +11,7 @@ export function tileLabel(tile) {
   if (!tile) return '空格'
   if (tile.type === 'rocket') return tile.dir === 'row' ? '横火箭' : '竖火箭'
   if (tile.type === 'bomb') return '炸弹'
-  if (tile.type === 'rainbow') return '彩虹炸弹'
+  if (tile.type === 'rainbow') return '彩虹鸟'
   return TILE_NAME[tile.type] ?? tile.type
 }
 

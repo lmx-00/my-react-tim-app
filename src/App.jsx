@@ -2,11 +2,14 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { AuthProvider } from './auth/AuthContext.jsx'
 import { GuestOnly, RequireAuth } from './auth/RequireAuth.jsx'
 import { Layout } from './components/Layout.jsx'
+import { AdminPage } from './pages/Admin.jsx'
 import { HomePage } from './pages/Home.jsx'
 import { LevelsPage } from './pages/Levels.jsx'
 import { LoginPage } from './pages/Login.jsx'
+import { PasswordPage } from './pages/Password.jsx'
 import { PlayPage } from './pages/Play.jsx'
 import { ProfilePage } from './pages/Profile.jsx'
+import { RankPage } from './pages/Rank.jsx'
 import { RecordsPage } from './pages/Records.jsx'
 import { RegisterPage } from './pages/Register.jsx'
 import { ResultPage } from './pages/Result.jsx'
@@ -45,7 +48,10 @@ export default function App() {
               <Route path="/play/:levelId" element={<PlayRoute />} />
               <Route path="/result/:sessionId" element={<ResultPage />} />
               <Route path="/records" element={<RecordsPage />} />
+              <Route path="/rank" element={<RankPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/password" element={<PasswordPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

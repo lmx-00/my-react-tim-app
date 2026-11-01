@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listLevels, listRecords } from '../api/game.js'
+import { listRecords } from '../api/game.js'
 import { Stars } from '../components/Stars.jsx'
 
 const PAGE_SIZE = 10
@@ -41,26 +41,11 @@ function formatTime(value) {
 
 export function RecordsPage() {
   const [data, setData] = useState(null)
-  const [levels, setLevels] = useState([])
   const [filter, setFilter] = useState('')
   const [levelId, setLevelId] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    listLevels()
-      .then((res) => {
-        if (!cancelled) setLevels(res.levels)
-      })
-      .catch(() => {
-        // 关卡筛选是附加功能，拿不到就不显示下拉框
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -127,21 +112,16 @@ export function RecordsPage() {
             {item.label}
           </button>
         ))}
-        {levels.length ? (
-          <select
-            className="chip chip-select"
-            aria-label="按关卡筛选"
-            value={levelId}
-            onChange={(event) => changeLevel(event.target.value)}
-          >
-            <option value="">所有关卡</option>
-            {levels.map((level) => (
-              <option key={level.id} value={level.id}>
-                第 {level.id} 关 {level.name}
-              </option>
-            ))}
-          </select>
-        ) : null}
+        <input
+          className="chip chip-select"
+          type="number"
+          min="1"
+          inputMode="numeric"
+          aria-label="按关卡号筛选"
+          placeholder="关卡号"
+          value={levelId}
+          onChange={(event) => changeLevel(event.target.value.replace(/\D/g, ''))}
+        />
       </div>
 
       {error ? <p className="form-error">{error}</p> : null}

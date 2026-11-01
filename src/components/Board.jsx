@@ -1,6 +1,18 @@
 import { tileLabel } from '../game/tiles.js'
 import { MonsterTile } from './MonsterTile.jsx'
 
+function RocketFace({ dir }) {
+  return (
+    <span className={`rocket-ship ${dir === 'col' ? 'is-col' : 'is-row'}`}>
+      <span className="rocket-ship-nose" />
+      <span className="rocket-ship-body" />
+      <span className="rocket-ship-fin is-left" />
+      <span className="rocket-ship-fin is-right" />
+      <span className="rocket-ship-flame" />
+    </span>
+  )
+}
+
 function offset(step) {
   if (!step) return '0px'
   return step > 0 ? 'calc(100% + var(--tile-gap))' : 'calc(-100% - var(--tile-gap))'
@@ -41,6 +53,7 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
           const fall = falling[key]
           const classes = ['tile', `tile-${tile?.type ?? 'empty'}`]
 
+          if (tile?.type === 'rocket' && tile.dir) classes.push(`is-${tile.dir}`)
           if (selected?.x === x && selected?.y === y) classes.push('is-selected')
           if (popping.has(key)) classes.push('is-popping')
           else if (spawning.has(key)) classes.push('is-spawned')
@@ -57,7 +70,11 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
               aria-label={`第${y + 1}行第${x + 1}列 ${tileLabel(tile)}`}
               onClick={() => onSelect({ x, y })}
             >
-              {tile?.type ? <MonsterTile type={tile.type} /> : null}
+              {tile?.type === 'rocket' ? (
+                <RocketFace dir={tile.dir} />
+              ) : tile?.type ? (
+                <MonsterTile type={tile.type} />
+              ) : null}
             </button>
           )
         }),

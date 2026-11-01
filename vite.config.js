@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // 监听所有网卡，同一局域网的人才能用本机 IP 打开
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

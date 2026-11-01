@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createSession, playMove, quitSession } from '../api/game.js'
+import { createSession, playMove, quitSession, undoMove, useHammer, useShuffle } from '../api/game.js'
 import { Board } from '../components/Board.jsx'
 import { buildFrames } from '../game/replay.js'
+import { playSound } from '../game/sound.js'
 import { goalProgressText, goalText } from '../game/tiles.js'
 
 // 和 index.css 里对应动画的时长保持一致，多等一点等动画落稳
@@ -28,6 +29,7 @@ export function PlayPage() {
   const [swap, setSwap] = useState(null)
   const [view, setView] = useState(null)
   const [combo, setCombo] = useState(null)
+  const [tool, setTool] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -55,15 +57,18 @@ export function PlayPage() {
   async function replay(frames, movesLeft) {
     for (const [index, frame] of frames.entries()) {
       // 连锁越往后节奏越快，不然一串大连锁要干等好几秒
-      const duration = Math.round(STEP_MS * Math.max(0.42, 1 - index * 0.09))
+      const dramatic = frame.banner || frame.effect === 'line' || frame.effect === 'color' || frame.effect === 'bomb'
+      const duration = dramatic ? 520 : Math.round(STEP_MS * Math.max(0.42, 1 - index * 0.09))
       if (frame.kind === 'pop') {
-        setView({ cells: frame.cells, popping: frame.popping, duration })
+        setView({ cells: frame.cells, popping: frame.popping, effect: frame.effect, duration })
         setSession((current) => ({
           ...current,
           score: current.score + frame.score,
           movesLeft,
         }))
-        if (frame.wave > 1) setCombo({ wave: frame.wave, score: frame.score })
+        if (frame.banner || frame.wave > 1) {
+          setCombo({ banner: frame.banner, wave: frame.wave, score: frame.score })
+        }
       } else {
         setView({
           cells: frame.cells,
@@ -101,9 +106,12 @@ export function PlayPage() {
           goalProgress: result.goalProgress,
           status: result.status,
           stars: result.stars,
+          canUndo: result.canUndo,
+          tools: result.tools ?? current.tools,
         }))
 
       if (!result.valid) {
+        playSound('fail')
         // 换不动：原路滑回去，顺带抖一下
         setSwap({ from, to, phase: 'back' })
         applyResult()
@@ -114,6 +122,7 @@ export function PlayPage() {
       } else {
         // 第一帧就是交换后的棋盘，和滑动动画无缝接上
         setSwap(null)
+        playSound(result.status === 'won' ? 'win' : 'pop')
         await replay(buildFrames(session.board.cells, result.events), result.movesLeft)
         setView(null)
         setCombo(null)
@@ -134,6 +143,10 @@ export function PlayPage() {
 
   function handleSelect(cell) {
     if (busy || !session || session.status !== 'playing') return
+    if (tool === 'hammer') {
+      hammerTile(cell)
+      return
+    }
     if (!selected) {
       setSelected(cell)
       return
@@ -147,6 +160,59 @@ export function PlayPage() {
       return
     }
     setSelected(cell)
+  }
+
+  async function hammerTile(cell) {
+    if (!session || busy) return
+    setBusy(true)
+    setSelected(null)
+    setTool(null)
+    try {
+      const result = await useHammer(session.sessionId, { x: cell.x, y: cell.y })
+      await replay(buildFrames(session.board.cells, result.events ?? []), result.movesLeft)
+      setView(null)
+      setCombo(null)
+      setSession((current) => ({ ...current, ...result }))
+      if (result.status === 'won' || result.status === 'lost') {
+        navigate(`/result/${session.sessionId}`, { replace: true })
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleUndo() {
+    if (!session || busy) return
+    setBusy(true)
+    setTool(null)
+    try {
+      const result = await undoMove(session.sessionId)
+      setView(null)
+      setCombo(null)
+      setSession(result)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleShuffle() {
+    if (!session || busy) return
+    setBusy(true)
+    setTool(null)
+    try {
+      const result = await useShuffle(session.sessionId)
+      await replay(buildFrames(session.board.cells, result.events ?? []), result.movesLeft)
+      setView(null)
+      setSession((current) => ({ ...current, ...result }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleQuit() {
@@ -181,9 +247,6 @@ export function PlayPage() {
   }
 
   const lowMoves = session.movesLeft <= 5
-  const hasRainbow = session.board.cells.some((row) =>
-    row.some((tile) => tile?.type === 'rainbow'),
-  )
 
   return (
     <section className="stack play-stack">
@@ -194,9 +257,6 @@ export function PlayPage() {
           </h1>
           <p>目标：{goalText(session.level)}</p>
           <p>{goalProgressText(session.level, session.score, session.goalProgress)}</p>
-          {hasRainbow ? (
-            <p className="muted">彩虹炸弹和旁边一换，炸掉周围一圈。</p>
-          ) : null}
         </div>
         <div className="hud-stats">
           <span>
@@ -219,11 +279,33 @@ export function PlayPage() {
           effects={view}
         />
         {combo ? (
-          <p className="combo" key={`${combo.wave}-${combo.score}`}>
-            连击 ×{combo.wave} <span>+{combo.score}</span>
+          <p className={`combo${combo.banner ? ' is-banner' : ''}`} key={`${combo.banner ?? ''}-${combo.wave}-${combo.score}`}>
+            {combo.banner || `连击 ×${combo.wave}`} <span>+{combo.score}</span>
           </p>
         ) : null}
       </div>
+      <div className="tool-bar">
+        <button type="button" className="btn btn-ghost" onClick={handleUndo} disabled={busy || !session.canUndo}>
+          后退
+        </button>
+        <button
+          type="button"
+          className={`btn btn-ghost${tool === 'hammer' ? ' is-on' : ''}`}
+          onClick={() => setTool((current) => (current === 'hammer' ? null : 'hammer'))}
+          disabled={busy || !session.tools?.hammer}
+        >
+          锤子 {session.tools?.hammer ?? 0}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={handleShuffle}
+          disabled={busy || !session.tools?.shuffle}
+        >
+          洗牌 {session.tools?.shuffle ?? 0}
+        </button>
+      </div>
+      {tool === 'hammer' ? <p className="muted">点一个格子，把它敲掉。不扣步数。</p> : null}
       <div className="actions">
         <button type="button" className="btn btn-ghost" onClick={handleQuit} disabled={busy}>
           返回关卡

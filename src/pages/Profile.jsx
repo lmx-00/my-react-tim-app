@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getStats, listLevels } from '../api/game.js'
 import { useAuth } from '../auth/useAuth.js'
+import { setPersonalSound, soundEnabled } from '../game/sound.js'
 
 function formatJoined(value) {
   if (!value) return ''
@@ -17,6 +18,7 @@ export function ProfilePage() {
   const [totalLevels, setTotalLevels] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [soundOn, setSoundOn] = useState(soundEnabled())
 
   useEffect(() => {
     let cancelled = false
@@ -37,6 +39,12 @@ export function ProfilePage() {
     }
   }, [])
 
+  function toggleSound() {
+    const next = !soundEnabled()
+    setPersonalSound(next)
+    setSoundOn(next)
+  }
+
   async function handleLogout() {
     await logout()
     navigate('/login', { replace: true })
@@ -48,15 +56,17 @@ export function ProfilePage() {
   const totalGames = stats?.totalGames ?? 0
   const winRate = totalGames ? Math.round(((stats?.wins ?? 0) / totalGames) * 100) : 0
   const progress = totalLevels ? Math.round((maxCleared / totalLevels) * 100) : 0
-  const allCleared = totalLevels > 0 && maxCleared >= totalLevels
-  const nextLevel = Math.min(maxCleared + 1, totalLevels || maxCleared + 1)
 
   return (
     <section className="stack">
       <div className="profile-head">
-        <span className="avatar" aria-hidden="true">
-          {username.slice(0, 1).toUpperCase() || '玩'}
-        </span>
+        {user?.avatarUrl ? (
+          <img className="avatar" src={user.avatarUrl} alt="" />
+        ) : (
+          <span className="avatar" aria-hidden="true">
+            {username.slice(0, 1).toUpperCase() || '玩'}
+          </span>
+        )}
         <div>
           <h1>{username || '我的'}</h1>
           {joined ? <p className="muted">{joined}</p> : null}
@@ -122,21 +132,22 @@ export function ProfilePage() {
         </>
       ) : null}
 
-      <div className="actions">
-        {allCleared ? (
-          <Link to="/levels" className="btn">
-            全部通关啦
-          </Link>
-        ) : (
-          <Link to={`/play/${nextLevel}`} className="btn">
-            继续闯第 {nextLevel} 关
-          </Link>
-        )}
-        <Link to="/records" className="btn btn-ghost">
-          游戏记录
+      <div className="account-card">
+        <button type="button" className="account-row" aria-pressed={soundOn} onClick={toggleSound}>
+          <div>
+            <strong>音效</strong>
+            <p className="muted">{soundOn ? '已打开' : '已关闭'}</p>
+          </div>
+          <span className={`switch${soundOn ? ' is-on' : ''}`} aria-hidden="true">
+            <span />
+          </span>
+        </button>
+        <Link className="account-link" to="/profile/password">
+          <span>修改密码</span>
+          <span aria-hidden="true">›</span>
         </Link>
-        <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-          退出登录
+        <button type="button" className="account-link account-logout" onClick={handleLogout}>
+          <span>退出登录</span>
         </button>
       </div>
     </section>
