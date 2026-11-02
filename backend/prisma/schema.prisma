@@ -10,7 +10,11 @@ datasource db {
 model User {
   id           String         @id @default(uuid())
   username     String         @unique
-  passwordHash String
+  passwordHash String?
+  phone        String?        @unique
+  openid       String?        @unique
+  nickname     String?
+  isGuest      Boolean        @default(false)
   avatarUrl    String?
   createdAt    DateTime       @default(now())
   failedLogins Int            @default(0)
@@ -19,6 +23,17 @@ model User {
   sessions     GameSession[]
   refreshTokens RefreshToken[]
   role         String         @default("player")
+  stamina      Int            @default(5)
+  staminaAt    DateTime       @default(now())
+  coins        Int            @default(0)
+  diamonds     Int            @default(0)
+  lastCheckIn  DateTime?
+  checkStreak  Int            @default(0)
+  claimedOffers Json          @default("[]")
+  tools        Json           @default("{\"hammer\":0,\"shuffle\":0,\"swap\":0}")
+  friends      Json           @default("[]")
+  mails        Mail[]
+  orders       Order[]
 }
 
 model RefreshToken {
@@ -75,10 +90,40 @@ model GameSession {
   durationMs   Int?
   history      Json      @default("[]")
   tools        Json      @default("{\"hammer\":3,\"shuffle\":1}")
+  reward       Json      @default("{}")
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([userId, endedAt])
+}
+
+model Mail {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  reward    Json     @default("{}")
+  claimed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, claimed])
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  outTradeNo String?  @unique
+  diamonds  Int
+  amountFen Int
+  channel   String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
 }
 
 model Setting {

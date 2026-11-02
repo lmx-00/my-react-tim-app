@@ -53,6 +53,8 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
           const fall = falling[key]
           const classes = ['tile', `tile-${tile?.type ?? 'empty'}`]
 
+          const ice = tile?.ice || (tile?.snow ? 1 : 0)
+          if (ice) classes.push(ice > 1 ? 'is-ice is-ice-2' : 'is-ice')
           if (tile?.type === 'rocket' && tile.dir) classes.push(`is-${tile.dir}`)
           if (selected?.x === x && selected?.y === y) classes.push('is-selected')
           if (popping.has(key)) classes.push('is-popping')

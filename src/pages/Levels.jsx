@@ -111,7 +111,7 @@ export function LevelsPage() {
       return
     }
     setError('')
-    navigate(`/play/${level.id}`)
+    navigate(`/load/${level.id}`)
   }
 
   return (
@@ -200,6 +200,7 @@ export function LevelsPage() {
                     <strong>{level.id}</strong>
                   </span>
                   <span className="den-name">{level.status === 'locked' ? '' : level.name}</span>
+                  {level.bestScore > 0 ? <span className="den-score">最高 {level.bestScore}</span> : null}
                   {level.status === 'cleared' ? <Stars value={level.stars} /> : null}
                 </button>
               </Fragment>

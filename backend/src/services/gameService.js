@@ -3,6 +3,7 @@ import {
   applyHammer,
   applyShuffleTool,
   applySwap,
+  applySwapTool,
   createBoard,
 } from '../game/engine.js'
 import {
@@ -16,6 +17,7 @@ import {
 import { rngFromState, randomSeed } from '../game/rng.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
+import { changeBag, coinsForStars, grantCoins, normalizeBag, spendStamina } from './walletService.js'
 
 function levelStatus(levelId, maxCleared) {
   if (levelId > maxCleared + 1) return 'locked'
@@ -108,7 +110,7 @@ async function closeSessions(sessions) {
   }
 }
 
-function serializeSession(session, level) {
+function serializeSession(session, level, bag) {
   return {
     sessionId: session.id,
     nextLevelId: level.id < MAX_LEVEL_ID ? level.id + 1 : null,
@@ -131,16 +133,50 @@ function serializeSession(session, level) {
     goalProgress: session.goalProgress,
     status: session.status,
     stars: session.stars,
+    rewardCoins: Number(session.reward?.coins ?? (session.status === 'won' ? coinsForStars(session.stars) : 0)),
+    rewardTools: session.reward?.tools ?? {},
     startedAt: session.startedAt,
     canUndo: Array.isArray(session.history) && session.history.length > 0,
-    tools: normalizeTools(session.tools),
+    tools: combineTools(session.tools, bag),
   }
 }
 
-function normalizeTools(tools) {
+function combineTools(sessionTools, bag) {
+  const free = normalizeTools(sessionTools)
+  const owned = normalizeBag(bag)
   return {
-    hammer: Number(tools?.hammer ?? 3),
-    shuffle: Number(tools?.shuffle ?? 1),
+    hammer: free.hammer + owned.hammer,
+    shuffle: free.shuffle + owned.shuffle,
+    swap: free.swap + owned.swap,
+  }
+}
+
+async function bagFor(userId) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { tools: true } })
+  return normalizeBag(user?.tools)
+}
+
+async function present(session, level) {
+  return serializeSession(session, level, await bagFor(session.userId))
+}
+
+function bagLog(session) {
+  return Array.isArray(session.tools?._bagSpent) ? session.tools._bagSpent : []
+}
+
+function persistTools(counts, log) {
+  return { ...normalizeTools(counts), _bagSpent: log.slice(-20) }
+}
+
+function normalizeTools(tools) {
+  const count = (value, fallback) => {
+    const number = Number(value)
+    return Number.isInteger(number) ? number : fallback
+  }
+  return {
+    hammer: count(tools?.hammer, 3),
+    shuffle: count(tools?.shuffle, 1),
+    swap: count(tools?.swap, 1),
   }
 }
 
@@ -179,7 +215,12 @@ async function updateProgressOnWin(userId, level, session) {
   const starsMap = { ...(progress?.levelStars ?? {}) }
   const bestMap = { ...(progress?.levelBest ?? {}) }
   const key = String(level.id)
-  starsMap[key] = Math.max(Number(starsMap[key] ?? 0), session.stars)
+  const prevStars = Number(starsMap[key] ?? 0)
+  const coins = coinsForStars(session.stars)
+  const tools = {}
+  if (session.stars >= 3 && prevStars < 3) tools.hammer = 1
+  else if (session.stars >= 2 && prevStars < 2) tools.shuffle = 1
+  starsMap[key] = Math.max(prevStars, session.stars)
   const prevBest = bestMap[key] ?? {}
   bestMap[key] = {
     score: Math.max(Number(prevBest.score ?? 0), session.score),
@@ -194,6 +235,11 @@ async function updateProgressOnWin(userId, level, session) {
       levelBest: bestMap,
     },
   })
+  await grantCoins(userId, coins)
+  if (Object.keys(tools).length) await changeBag(userId, tools)
+  const reward = { coins, tools }
+  await prisma.gameSession.update({ where: { id: session.id }, data: { reward } })
+  return reward
 }
 
 function finishSession(session, status, level) {
@@ -223,8 +269,9 @@ export async function createSession(userId, levelId) {
   const resumable = playing.find(
     (item) => item.levelId === level.id && expireIfNeeded({ ...item }).status === 'playing',
   )
-  if (resumable) return serializeSession(resumable, level)
+  if (resumable) return present(resumable, level)
 
+  await spendStamina(userId)
   await closeSessions(playing)
 
   const seed = randomSeed()
@@ -241,17 +288,17 @@ export async function createSession(userId, levelId) {
       rngState: rng.getState(),
       movesLeft: level.moveLimit,
       goalProgress: emptyGoalProgress(level),
-      tools: { hammer: settings.hammer, shuffle: settings.shuffle },
+      tools: { hammer: settings.hammer, shuffle: settings.shuffle, swap: settings.swap },
     },
   })
 
-  return serializeSession(session, level)
+  return present(session, level)
 }
 
 export async function getSession(userId, sessionId) {
   const session = await loadOwnedSession(userId, sessionId)
   const level = await prisma.level.findUnique({ where: { id: session.levelId } })
-  return serializeSession(session, level)
+  return present(session, level)
 }
 
 export async function playMove(userId, sessionId, move) {
@@ -311,26 +358,16 @@ export async function playMove(userId, sessionId, move) {
       goalProgress,
       lastMoveAt: new Date(),
       history: pushHistory(session),
+      tools: persistTools(session.tools, [...bagLog(session), null]),
       ...(finish ?? {}),
     },
   })
 
   if (finish?.status === 'won') {
-    await updateProgressOnWin(userId, level, updated)
+    updated.reward = await updateProgressOnWin(userId, level, updated)
   }
 
-  return {
-    valid: result.valid,
-    events: result.events,
-    board: updated.board,
-    score: updated.score,
-    movesLeft: updated.movesLeft,
-    goalProgress: updated.goalProgress,
-    status: updated.status,
-    stars: updated.stars,
-    canUndo: true,
-    tools: normalizeTools(updated.tools),
-  }
+  return { ...(await present(updated, level)), valid: result.valid, events: result.events }
 }
 
 export async function undoMove(userId, sessionId) {
@@ -344,6 +381,10 @@ export async function undoMove(userId, sessionId) {
   const previous = history.at(-1)
   if (!previous) throw new AppError(409, 'NO_UNDO', '没有可以后退的步骤')
 
+  const log = bagLog(session)
+  const spent = log.at(-1)
+  if (typeof spent === 'string') await changeBag(userId, { [spent]: 1 })
+
   const updated = await prisma.gameSession.update({
     where: { id: session.id },
     data: {
@@ -354,23 +395,28 @@ export async function undoMove(userId, sessionId) {
       moveCount: previous.moveCount,
       collected: previous.collected ?? {},
       goalProgress: previous.goalProgress,
-      tools: previous.tools ?? normalizeTools(session.tools),
+      tools: persistTools(previous.tools ?? session.tools, log.slice(0, -1)),
       history: history.slice(0, -1),
       lastMoveAt: new Date(),
     },
   })
   const level = await prisma.level.findUnique({ where: { id: session.levelId } })
-  return serializeSession(updated, level)
+  return present(updated, level)
 }
 
 async function spendTool(session, tool) {
   const tools = normalizeTools(session.tools)
-  if (tools[tool] <= 0) throw new AppError(409, 'NO_TOOL', '这个道具已经用完了')
-  tools[tool] -= 1
-  return tools
+  if (tools[tool] > 0) {
+    tools[tool] -= 1
+    return { tools, fromBag: false }
+  }
+  const bag = await bagFor(session.userId)
+  if (bag[tool] <= 0) throw new AppError(409, 'NO_TOOL', '这个道具已经用完了')
+  await changeBag(session.userId, { [tool]: -1 })
+  return { tools, fromBag: true }
 }
 
-async function settleTool(userId, session, level, result, tools) {
+async function settleTool(userId, session, level, result, tools, toolSpent) {
   const collected = { ...(session.collected ?? {}) }
   for (const [type, count] of Object.entries(result.collected ?? {})) {
     collected[type] = (collected[type] ?? 0) + count
@@ -387,60 +433,85 @@ async function settleTool(userId, session, level, result, tools) {
       score,
       collected,
       goalProgress,
-      tools,
+      tools: persistTools(tools, [...bagLog(session), toolSpent]),
       history: pushHistory(session),
       lastMoveAt: new Date(),
       ...(finish ?? {}),
     },
   })
-  if (finish?.status === 'won') await updateProgressOnWin(userId, level, updated)
-  return { ...serializeSession(updated, level), events: result.events, valid: true }
+  if (finish?.status === 'won') updated.reward = await updateProgressOnWin(userId, level, updated)
+  return { ...(await present(updated, level)), events: result.events, valid: true }
 }
 
 export async function useHammer(userId, sessionId, point) {
   const session = await loadOwnedSession(userId, sessionId)
   if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
-  const tools = await spendTool(session, 'hammer')
   const level = await prisma.level.findUnique({ where: { id: session.levelId } })
   const config = getLevelConfig(level.id)
   const rng = rngFromState(session.rngState)
   const result = applyHammer(session.board, point, config, rng)
   if (!result.valid) throw new AppError(400, 'INVALID_TOOL', '这里不能敲')
+  const spent = await spendTool(session, 'hammer')
   result.rngState = rng.getState()
-  return settleTool(userId, session, level, result, tools)
+  return settleTool(userId, session, level, result, spent.tools, spent.fromBag ? 'hammer' : null)
 }
 
 export async function useShuffle(userId, sessionId) {
   const session = await loadOwnedSession(userId, sessionId)
   if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
-  const tools = await spendTool(session, 'shuffle')
+  const spent = await spendTool(session, 'shuffle')
   const level = await prisma.level.findUnique({ where: { id: session.levelId } })
   const config = getLevelConfig(level.id)
   const rng = rngFromState(session.rngState)
   const result = applyShuffleTool(session.board, config, rng)
   result.rngState = rng.getState()
-  return settleTool(userId, session, level, result, tools)
+  return settleTool(userId, session, level, result, spent.tools, spent.fromBag ? 'shuffle' : null)
+}
+
+export async function useSwapTool(userId, sessionId, move) {
+  const session = await loadOwnedSession(userId, sessionId)
+  if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
+  const level = await prisma.level.findUnique({ where: { id: session.levelId } })
+  const config = getLevelConfig(level.id)
+  const rng = rngFromState(session.rngState)
+  const result = applySwapTool(session.board, move, config, rng)
+  if (!result.valid) throw new AppError(400, 'INVALID_TOOL', '这两个格子不能交换')
+  const spent = await spendTool(session, 'swap')
+  result.rngState = rng.getState()
+  return settleTool(userId, session, level, result, spent.tools, spent.fromBag ? 'swap' : null)
 }
 
 // 星星总数存在 progress.levelStars 这个 JSON 里，数据库排不了序，
 // 只能全量拉回来在内存里排完再切页。
-export async function listLeaderboard(userId, { page = 1, pageSize = 50 } = {}) {
+export async function listLeaderboard(userId, { page = 1, pageSize = 50, scope = 'all', levelId = null } = {}) {
+  const me = await prisma.user.findUnique({ where: { id: userId } })
+  const friendIds = new Set(Array.isArray(me?.friends) ? me.friends : [])
   const users = await prisma.user.findMany({ include: { progress: true } })
-  const rows = users
-    .map((user) => {
-      const stars = Object.values(user.progress?.levelStars ?? {}).reduce(
-        (sum, value) => sum + Number(value ?? 0),
-        0,
-      )
-      return {
-        username: user.username,
-        maxCleared: user.progress?.maxCleared ?? 0,
-        totalStars: stars,
-        me: user.id === userId,
-      }
-    })
-    .sort((a, b) => b.totalStars - a.totalStars || b.maxCleared - a.maxCleared)
-    .map((row, index) => ({ rank: index + 1, ...row }))
+  let rows = users.map((user) => {
+    const stars = Object.values(user.progress?.levelStars ?? {}).reduce(
+      (sum, value) => sum + Number(value ?? 0),
+      0,
+    )
+    const best = levelId ? user.progress?.levelBest?.[String(levelId)] : null
+    return {
+      id: user.id,
+      username: user.nickname || user.username,
+      maxCleared: user.progress?.maxCleared ?? 0,
+      totalStars: stars,
+      score: levelId ? Number(best?.score ?? 0) : null,
+      me: user.id === userId,
+    }
+  })
+
+  if (levelId) {
+    rows = rows.filter((row) => row.score > 0).sort((a, b) => b.score - a.score || b.totalStars - a.totalStars)
+  } else {
+    rows = rows.sort((a, b) => b.totalStars - a.totalStars || b.maxCleared - a.maxCleared)
+  }
+  if (scope === 'friends') {
+    rows = rows.filter((row) => row.me || friendIds.has(row.id))
+  }
+  rows = rows.map(({ id, ...row }, index) => ({ rank: index + 1, ...row }))
 
   const start = (page - 1) * pageSize
   return {
@@ -448,16 +519,54 @@ export async function listLeaderboard(userId, { page = 1, pageSize = 50 } = {}) 
     total: rows.length,
     page,
     pageSize,
-    // 自己掉出已加载的名次时，前端要单独把这一行钉在底部
+    scope,
+    levelId: levelId || null,
     me: rows.find((row) => row.me) ?? null,
   }
+}
+
+async function findPlayer(name) {
+  const trimmed = name.trim()
+  const matches = await prisma.user.findMany({
+    where: { OR: [{ username: trimmed }, { nickname: trimmed }] },
+  })
+  if (matches.length === 0) throw new AppError(404, 'USER_NOT_FOUND', '找不到这个玩家')
+  if (matches.length > 1) throw new AppError(409, 'AMBIGUOUS', '有重名，请改填账号名')
+  return matches[0]
+}
+
+export async function addFriend(userId, name) {
+  const friend = await findPlayer(name)
+  if (friend.id === userId) throw new AppError(400, 'INVALID_FRIEND', '不能加自己')
+  const me = await prisma.user.findUnique({ where: { id: userId } })
+  const mine = Array.isArray(me.friends) ? [...me.friends] : []
+  const theirs = Array.isArray(friend.friends) ? [...friend.friends] : []
+  if (!mine.includes(friend.id)) mine.push(friend.id)
+  if (!theirs.includes(userId)) theirs.push(userId)
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { friends: mine } }),
+    prisma.user.update({ where: { id: friend.id }, data: { friends: theirs } }),
+  ])
+  return { username: friend.nickname || friend.username }
+}
+
+export async function removeFriend(userId, name) {
+  const friend = await findPlayer(name)
+  const me = await prisma.user.findUnique({ where: { id: userId } })
+  const mine = (Array.isArray(me.friends) ? me.friends : []).filter((id) => id !== friend.id)
+  const theirs = (Array.isArray(friend.friends) ? friend.friends : []).filter((id) => id !== userId)
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { friends: mine } }),
+    prisma.user.update({ where: { id: friend.id }, data: { friends: theirs } }),
+  ])
+  return { username: friend.nickname || friend.username }
 }
 
 export async function getThemeSetting() {
   return getSiteSettings()
 }
 
-const SITE_DEFAULTS = { sound: false, undo: true, hammer: 3, shuffle: 1 }
+const SITE_DEFAULTS = { sound: false, undo: true, hammer: 3, shuffle: 1, swap: 1 }
 
 export async function getSiteSettings() {
   const [themeRow, siteRow] = await Promise.all([
@@ -471,6 +580,7 @@ export async function getSiteSettings() {
     undo: site.undo !== false,
     hammer: clampCount(site.hammer, SITE_DEFAULTS.hammer),
     shuffle: clampCount(site.shuffle, SITE_DEFAULTS.shuffle),
+    swap: clampCount(site.swap, SITE_DEFAULTS.swap),
   }
 }
 
@@ -488,6 +598,7 @@ export async function setSiteSettings(input) {
     undo: typeof input.undo === 'boolean' ? input.undo : current.undo,
     hammer: input.hammer == null ? current.hammer : clampCount(input.hammer, current.hammer),
     shuffle: input.shuffle == null ? current.shuffle : clampCount(input.shuffle, current.shuffle),
+    swap: input.swap == null ? current.swap : clampCount(input.swap, current.swap),
   }
   await prisma.$transaction([
     prisma.setting.upsert({
@@ -497,8 +608,8 @@ export async function setSiteSettings(input) {
     }),
     prisma.setting.upsert({
       where: { key: 'site' },
-      update: { value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle } },
-      create: { key: 'site', value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle } },
+      update: { value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle, swap: next.swap } },
+      create: { key: 'site', value: { sound: next.sound, undo: next.undo, hammer: next.hammer, shuffle: next.shuffle, swap: next.swap } },
     }),
   ])
   return next
@@ -523,7 +634,7 @@ export async function quitSession(userId, sessionId) {
     },
   })
   const level = await prisma.level.findUnique({ where: { id: session.levelId } })
-  return serializeSession(updated, level)
+  return present(updated, level)
 }
 
 export async function listRecords(userId, { page, pageSize, result, levelId }) {
@@ -573,7 +684,7 @@ export async function getStats(userId) {
   })
 
   return {
-    username: me.username,
+    username: me.nickname || me.username,
     createdAt: me.createdAt,
     totalGames: ended.length,
     wins: ended.filter((s) => s.status === 'won').length,

@@ -46,17 +46,27 @@ export function buildFrames(startCells, events) {
       case 'match':
       case 'rainbow': {
         flush()
+        const shown = cloneCells(cells)
+        const removed = []
+        for (const [y, x] of event.cells) {
+          const tile = cells[y]?.[x]
+          if (tile?.ice > 1) {
+            const cracked = { ...tile, ice: tile.ice - 1 }
+            shown[y][x] = cracked
+            cells[y][x] = cracked
+          } else {
+            removed.push(cellKey(y, x))
+            if (cells[y]) cells[y][x] = null
+          }
+        }
         frames.push({
           kind: 'pop',
-          cells: cloneCells(cells),
-          popping: event.cells.map(([y, x]) => cellKey(y, x)),
+          cells: shown,
+          popping: removed,
           wave: event.wave ?? 1,
           score: event.score ?? 0,
           effect: event.effect ?? (event.type === 'rainbow' ? 'color' : 'match'),
         })
-        for (const [y, x] of event.cells) {
-          if (cells[y]) cells[y][x] = null
-        }
         break
       }
 
@@ -118,6 +128,19 @@ export function buildFrames(startCells, events) {
       case 'shuffle': {
         flush()
         cells = cloneCells(event.board.cells)
+        frames.push({ kind: 'settle', cells: cloneCells(cells), falling: {}, spawning: [] })
+        break
+      }
+
+      case 'ice':
+      case 'snow': {
+        flush()
+        for (const [y, x] of event.cells) {
+          const tile = cells[y]?.[x]
+          if (!tile) continue
+          if (tile.ice > 1) cells[y][x] = { ...tile, ice: tile.ice - 1 }
+          else cells[y][x] = { ...tile, ice: 0, snow: false }
+        }
         frames.push({ kind: 'settle', cells: cloneCells(cells), falling: {}, spawning: [] })
         break
       }

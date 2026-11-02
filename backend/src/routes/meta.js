@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
-import { leaderboardQuerySchema, settingsSchema } from '../lib/schemas.js'
+import { friendSchema, leaderboardQuerySchema, settingsSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { adminRequired, authRequired } from '../middleware/auth.js'
-import { getSiteSettings, listLeaderboard, setSiteSettings } from '../services/gameService.js'
+import { addFriend, getSiteSettings, listLeaderboard, removeFriend, setSiteSettings } from '../services/gameService.js'
 
 export const metaRouter = Router()
 
@@ -27,6 +27,24 @@ metaRouter.get(
   '/settings',
   asyncHandler(async (req, res) => {
     ok(res, await getSiteSettings())
+  }),
+)
+
+metaRouter.delete(
+  '/friends',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(friendSchema, req.body)
+    ok(res, await removeFriend(req.user.id, body.username))
+  }),
+)
+
+metaRouter.post(
+  '/friends',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(friendSchema, req.body)
+    ok(res, await addFriend(req.user.id, body.username))
   }),
 )
 

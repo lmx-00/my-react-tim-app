@@ -11,6 +11,7 @@ import {
   undoMove,
   useHammer,
   useShuffle,
+  useSwapTool,
 } from '../services/gameService.js'
 
 export const gameRouter = Router()
@@ -71,5 +72,14 @@ gameRouter.post(
   authRequired,
   asyncHandler(async (req, res) => {
     ok(res, await useShuffle(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/swap',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const move = parseWith(moveSchema, req.body)
+    ok(res, await useSwapTool(req.user.id, req.params.id, move))
   }),
 )

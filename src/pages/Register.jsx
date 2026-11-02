@@ -6,9 +6,11 @@ const USERNAME_RULE = /^[a-zA-Z0-9_]{3,16}$/
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,32}$/
 
 export function RegisterPage() {
-  const { register } = useAuth()
+  const { register, registerPhone } = useAuth()
   const navigate = useNavigate()
+  const [mode, setMode] = useState('username')
   const [username, setUsername] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -18,7 +20,12 @@ export function RegisterPage() {
     event.preventDefault()
     setError('')
 
-    if (!USERNAME_RULE.test(username.trim())) {
+    if (mode === 'phone') {
+      if (!/^1\d{10}$/.test(phone)) {
+        setError('请输入 11 位手机号')
+        return
+      }
+    } else if (!USERNAME_RULE.test(username.trim())) {
       setError('用户名需为 3–16 位字母、数字或下划线')
       return
     }
@@ -33,7 +40,8 @@ export function RegisterPage() {
 
     setSubmitting(true)
     try {
-      await register(username.trim(), password)
+      if (mode === 'phone') await registerPhone(phone, password)
+      else await register(username.trim(), password)
       navigate('/levels', { replace: true })
     } catch (err) {
       setError(err.message || '注册失败')
@@ -46,17 +54,38 @@ export function RegisterPage() {
     <section className="stack auth-stack">
       <h1>注册</h1>
       <p className="lede">注册成功后会自动登录。</p>
+      <div className="auth-switch">
+        <button type="button" className={mode === 'username' ? 'is-on' : ''} onClick={() => setMode('username')}>
+          用户名
+        </button>
+        <button type="button" className={mode === 'phone' ? 'is-on' : ''} onClick={() => setMode('phone')}>
+          手机号
+        </button>
+      </div>
       <form className="form" onSubmit={handleSubmit}>
         {error ? <p className="form-error">{error}</p> : null}
-        <label>
-          用户名
-          <input
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-        </label>
+        {mode === 'phone' ? (
+          <label>
+            手机号
+            <input
+              name="phone"
+              inputMode="numeric"
+              autoComplete="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+          </label>
+        ) : (
+          <label>
+            用户名
+            <input
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </label>
+        )}
         <label>
           密码
           <input

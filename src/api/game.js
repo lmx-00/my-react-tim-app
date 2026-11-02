@@ -1,7 +1,15 @@
 import { api } from './client.js'
 
+export function notifyWallet() {
+  window.dispatchEvent(new Event('hm-wallet'))
+}
+
 export function listLevels() {
   return api('/levels')
+}
+
+export function getLevel(levelId) {
+  return api(`/levels/${levelId}`)
 }
 
 let creating = null
@@ -47,8 +55,22 @@ export function useShuffle(sessionId) {
   return api(`/game/sessions/${sessionId}/shuffle`, { method: 'POST' })
 }
 
-export function getLeaderboard({ page = 1, pageSize = 50 } = {}) {
-  return api(`/leaderboard?${new URLSearchParams({ page, pageSize })}`)
+export function useSwap(sessionId, move) {
+  return api(`/game/sessions/${sessionId}/swap`, { method: 'POST', body: move })
+}
+
+export function getLeaderboard({ page = 1, pageSize = 50, scope = 'all', levelId } = {}) {
+  const params = { page, pageSize, scope }
+  if (levelId) params.levelId = String(levelId)
+  return api(`/leaderboard?${new URLSearchParams(params)}`)
+}
+
+export function addFriend(username) {
+  return api('/friends', { method: 'POST', body: { username } })
+}
+
+export function removeFriend(username) {
+  return api('/friends', { method: 'DELETE', body: { username } })
 }
 
 export function getTheme() {
@@ -72,4 +94,52 @@ export function listRecords({ page = 1, pageSize = 10, result, levelId } = {}) {
   if (result) query.set('result', result)
   if (levelId) query.set('levelId', levelId)
   return api(`/records?${query}`)
+}
+
+export function getWallet() {
+  return api('/wallet')
+}
+
+export function getShop() {
+  return api('/shop')
+}
+
+export function buyShopItem(id) {
+  return api(`/shop/${id}`, { method: 'POST' })
+}
+
+export function getBag() {
+  return api('/bag')
+}
+
+export function listMail() {
+  return api('/mail')
+}
+
+export function claimMail(id) {
+  return api(`/mail/${id}/claim`, { method: 'POST' })
+}
+
+export function claimAllMail() {
+  return api('/mail/claim-all', { method: 'POST' })
+}
+
+export function checkIn() {
+  return api('/activity/check-in', { method: 'POST' })
+}
+
+export function getActivity() {
+  return api('/activity')
+}
+
+export function claimEvent(id) {
+  return api(`/activity/${id}/claim`, { method: 'POST' })
+}
+
+export function createRecharge(productId) {
+  return api('/recharge', { method: 'POST', body: { productId } })
+}
+
+export function payRecharge(id, channel) {
+  return api(`/recharge/${id}/pay`, { method: 'POST', body: { channel } })
 }

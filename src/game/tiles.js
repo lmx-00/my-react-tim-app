@@ -12,7 +12,7 @@ export function tileLabel(tile) {
   if (tile.type === 'rocket') return tile.dir === 'row' ? '横火箭' : '竖火箭'
   if (tile.type === 'bomb') return '炸弹'
   if (tile.type === 'rainbow') return '彩虹鸟'
-  return TILE_NAME[tile.type] ?? tile.type
+  return `${TILE_NAME[tile.type] ?? tile.type}${tile.ice || tile.snow ? '，结冰' : ''}`
 }
 
 export function goalText(level) {

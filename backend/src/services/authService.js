@@ -1,14 +1,27 @@
 import { LOGIN_LOCK_MS, MAX_LOGIN_ATTEMPTS, REFRESH_TOKEN_DAYS } from '../game/constants.js'
+import { config } from '../config.js'
 import { AppError } from '../lib/errors.js'
 import { signAccessToken, refreshCookieOptions } from '../lib/jwt.js'
 import { hashPassword, verifyPassword } from '../lib/password.js'
 import { prisma } from '../lib/prisma.js'
 import { createRefreshTokenValue, hashToken } from '../lib/tokens.js'
+import crypto from 'crypto'
+
+function maskPhone(phone) {
+  if (!phone) return null
+  return `${phone.slice(0, 3)}****${phone.slice(7)}`
+}
 
 function publicUser(user) {
   return {
     id: user.id,
     username: user.username,
+    nickname: user.nickname ?? null,
+    phone: maskPhone(user.phone),
+    hasPhone: Boolean(user.phone),
+    hasOpenid: Boolean(user.openid),
+    hasPassword: Boolean(user.passwordHash),
+    isGuest: Boolean(user.isGuest),
     createdAt: user.createdAt,
     role: user.role ?? 'player',
     avatarUrl: user.avatarUrl ?? null,
@@ -67,7 +80,7 @@ export async function loginUser({ username, password }) {
     throw new AppError(429, 'ACCOUNT_LOCKED', '登录失败次数过多，请 10 分钟后再试')
   }
 
-  const good = await verifyPassword(password, user.passwordHash)
+  const good = user.passwordHash ? await verifyPassword(password, user.passwordHash) : false
   if (!good) {
     const failedLogins = user.failedLogins + 1
     const lockedUntil = failedLogins >= MAX_LOGIN_ATTEMPTS
@@ -122,8 +135,10 @@ export async function logoutRefreshToken(refreshValue) {
 export async function changePassword(userId, { oldPassword, newPassword }) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new AppError(401, 'UNAUTHORIZED', '请先登录')
-  const good = await verifyPassword(oldPassword, user.passwordHash)
-  if (!good) throw new AppError(401, 'INVALID_CREDENTIALS', '当前密码不正确')
+  const good = user.passwordHash ? await verifyPassword(oldPassword, user.passwordHash) : false
+  if (!good) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', user.passwordHash ? '当前密码不正确' : '当前账号还没有密码，请先绑定手机号')
+  }
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await hashPassword(newPassword) },
@@ -173,12 +188,173 @@ export async function getMe(userId) {
 
   return {
     id: user.id,
-    username: user.username,
+    username: user.nickname || user.username,
     avatarUrl: user.avatarUrl ?? null,
+    phone: maskPhone(user.phone),
+    hasPhone: Boolean(user.phone),
+    hasOpenid: Boolean(user.openid),
+    isGuest: Boolean(user.isGuest),
     createdAt: user.createdAt,
     progress: {
       maxCleared: user.progress?.maxCleared ?? 0,
       stats,
     },
   }
+}
+
+function cleanNickname(value) {
+  const nickname = String(value ?? '').trim().slice(0, 32)
+  return nickname || null
+}
+
+function cleanAvatar(value) {
+  const avatarUrl = String(value ?? '').trim()
+  if (!avatarUrl || avatarUrl.length > 500) return null
+  try {
+    if (new URL(avatarUrl).protocol !== 'https:') return null
+  } catch {
+    return null
+  }
+  return avatarUrl
+}
+
+async function createPlayer(data) {
+  return prisma.user.create({
+    data: {
+      ...data,
+      progress: { create: {} },
+    },
+  })
+}
+
+async function createNamedPlayer(prefix, data) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const username = `${prefix}${crypto.randomBytes(4).toString('hex')}`.slice(0, 16)
+    try {
+      return await createPlayer({ username, ...data })
+    } catch (err) {
+      if (err?.code !== 'P2002') throw err
+    }
+  }
+  throw new AppError(500, 'ACCOUNT_CREATE_FAILED', '创建账号失败，请再试一次')
+}
+
+async function clearLoginLock(userId) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { failedLogins: 0, lockedUntil: null },
+  })
+}
+
+async function rejectBadPassword(user) {
+  const failedLogins = user.failedLogins + 1
+  const lockedUntil = failedLogins >= MAX_LOGIN_ATTEMPTS
+    ? new Date(Date.now() + LOGIN_LOCK_MS)
+    : null
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { failedLogins, lockedUntil },
+  })
+}
+
+export async function registerPhone({ phone, password }) {
+  const existing = await prisma.user.findUnique({ where: { phone } })
+  if (existing) throw new AppError(409, 'PHONE_TAKEN', '这个手机号已经注册')
+  return createPlayer({
+    username: `p${phone}`,
+    phone,
+    passwordHash: await hashPassword(password),
+    isGuest: false,
+  })
+}
+
+export async function loginPhone({ phone, password }) {
+  const user = await prisma.user.findUnique({ where: { phone } })
+  if (!user?.passwordHash) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', '手机号或密码错误')
+  }
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    throw new AppError(429, 'ACCOUNT_LOCKED', '登录失败次数过多，请 10 分钟后再试')
+  }
+  const good = await verifyPassword(password, user.passwordHash)
+  if (!good) {
+    await rejectBadPassword(user)
+    throw new AppError(401, 'INVALID_CREDENTIALS', '手机号或密码错误')
+  }
+  await clearLoginLock(user.id)
+  return prisma.user.findUnique({ where: { id: user.id } })
+}
+
+export async function loginGuest() {
+  return createNamedPlayer('g', { isGuest: true })
+}
+
+async function resolveOpenId(body) {
+  const code = String(body.code ?? '').trim()
+  if (code && config.wechatAppId && config.wechatSecret) {
+    const url = new URL('https://api.weixin.qq.com/sns/jscode2session')
+    url.searchParams.set('appid', config.wechatAppId)
+    url.searchParams.set('secret', config.wechatSecret)
+    url.searchParams.set('js_code', code)
+    url.searchParams.set('grant_type', 'authorization_code')
+    const response = await fetch(url)
+    const data = await response.json()
+    if (!data.openid) throw new AppError(401, 'WECHAT_FAILED', '微信登录失败')
+    return data.openid
+  }
+  const openid = String(body.openid ?? '').trim()
+  if (/^[A-Za-z0-9_-]{6,64}$/.test(openid)) return openid
+  throw new AppError(400, 'WECHAT_MISSING', '请从微信小程序打开后再登录')
+}
+
+async function saveWechatProfile(user, body, openid) {
+  return prisma.user.update({
+    where: { id: user.id },
+    data: {
+      openid,
+      nickname: cleanNickname(body.nickname) ?? user.nickname,
+      avatarUrl: cleanAvatar(body.avatarUrl) ?? user.avatarUrl,
+      failedLogins: 0,
+      lockedUntil: null,
+    },
+  })
+}
+
+export async function loginWechat(body) {
+  const openid = await resolveOpenId(body)
+  const existing = await prisma.user.findUnique({ where: { openid } })
+  if (existing) return saveWechatProfile(existing, body, openid)
+  return createNamedPlayer('wx', {
+    openid,
+    nickname: cleanNickname(body.nickname),
+    avatarUrl: cleanAvatar(body.avatarUrl),
+    isGuest: false,
+  })
+}
+
+export async function bindPhone(userId, { phone, password }) {
+  const taken = await prisma.user.findUnique({ where: { phone } })
+  if (taken && taken.id !== userId) {
+    throw new AppError(409, 'PHONE_TAKEN', '这个手机号已经绑在别的账号上')
+  }
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      phone,
+      passwordHash: await hashPassword(password),
+      isGuest: false,
+    },
+  })
+  return publicUser(user)
+}
+
+export async function bindWechat(userId, body) {
+  const openid = await resolveOpenId(body)
+  const taken = await prisma.user.findUnique({ where: { openid } })
+  if (taken && taken.id !== userId) {
+    throw new AppError(409, 'OPENID_TAKEN', '这个微信已经绑在别的账号上')
+  }
+  const current = await prisma.user.findUnique({ where: { id: userId } })
+  const user = await saveWechatProfile(current, body, openid)
+  return publicUser(user)
 }

@@ -17,6 +17,7 @@ export function AdminPage() {
     undo: true,
     hammer: 3,
     shuffle: 1,
+    swap: 1,
   })
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
@@ -125,6 +126,16 @@ export function AdminPage() {
               max="9"
               value={form.shuffle}
               onChange={(event) => patch({ shuffle: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            每局交换次数
+            <input
+              type="number"
+              min="0"
+              max="9"
+              value={form.swap ?? 1}
+              onChange={(event) => patch({ swap: Number(event.target.value) })}
             />
           </label>
         </fieldset>

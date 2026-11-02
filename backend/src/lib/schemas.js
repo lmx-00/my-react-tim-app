@@ -20,6 +20,25 @@ export const loginSchema = z.object({
   password: z.string().min(1, '请输入密码'),
 })
 
+const phoneSchema = z.string().regex(/^1\d{10}$/, '请输入 11 位手机号')
+
+export const phoneAuthSchema = z.object({
+  phone: phoneSchema,
+  password: registerSchema.shape.password,
+})
+
+export const phoneLoginSchema = z.object({
+  phone: phoneSchema,
+  password: z.string().min(1, '请输入密码'),
+})
+
+export const wechatAuthSchema = z.object({
+  code: z.string().min(1).max(128).optional(),
+  openid: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/, '微信身份不正确').optional(),
+  nickname: z.string().max(32).optional(),
+  avatarUrl: z.string().max(500).optional(),
+})
+
 export const createSessionSchema = z.object({
   levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID),
 })
@@ -42,6 +61,7 @@ export const settingsSchema = z.object({
   undo: z.boolean().optional(),
   hammer: z.coerce.number().int().min(0).max(9).optional(),
   shuffle: z.coerce.number().int().min(0).max(9).optional(),
+  swap: z.coerce.number().int().min(0).max(9).optional(),
 })
 
 export const passwordChangeSchema = z.object({
@@ -64,4 +84,10 @@ export const recordsQuerySchema = z.object({
 export const leaderboardQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  scope: z.enum(['all', 'friends']).optional(),
+  levelId: z.coerce.number().int().min(1).max(1000).optional(),
+})
+
+export const friendSchema = z.object({
+  username: z.string().trim().min(1).max(32),
 })

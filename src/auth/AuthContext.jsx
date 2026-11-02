@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { loginRequest, logoutRequest, registerRequest, saveAvatarRequest } from '../api/auth.js'
+import { loginRequest, logoutRequest, registerRequest, registerPhoneRequest, loginPhoneRequest, guestLoginRequest, wechatLoginRequest, bindPhoneRequest, bindWechatRequest, saveAvatarRequest } from '../api/auth.js'
 import { onAuthChange, refreshAuth, setAuthToken } from '../api/client.js'
 import { AuthContext } from './useAuth.js'
 
@@ -65,6 +65,36 @@ export function AuthProvider({ children }) {
         const data = await registerRequest(username, password)
         applyAuth(data)
         return data
+      },
+      async registerPhone(phone, password) {
+        const data = await registerPhoneRequest(phone, password)
+        applyAuth(data)
+        return data
+      },
+      async loginPhone(phone, password) {
+        const data = await loginPhoneRequest(phone, password)
+        applyAuth(data)
+        return data
+      },
+      async loginGuest() {
+        const data = await guestLoginRequest()
+        applyAuth(data)
+        return data
+      },
+      async loginWechat(body) {
+        const data = await wechatLoginRequest(body)
+        applyAuth(data)
+        return data
+      },
+      async bindPhone(phone, password) {
+        const next = await bindPhoneRequest(phone, password)
+        setUser(next)
+        return next
+      },
+      async bindWechat(body) {
+        const next = await bindWechatRequest(body)
+        setUser(next)
+        return next
       },
       async logout() {
         try {

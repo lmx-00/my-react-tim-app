@@ -22,6 +22,16 @@ export const config = {
   cookieSameSite: process.env.COOKIE_SAMESITE ?? 'lax',
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProd,
+  wechatAppId: process.env.WECHAT_APPID ?? '',
+  wechatSecret: process.env.WECHAT_SECRET ?? '',
+  wechatMchId: process.env.WECHAT_MCH_ID ?? '',
+  wechatMchSerial: process.env.WECHAT_MCH_SERIAL ?? '',
+  wechatMchPrivateKey: process.env.WECHAT_MCH_PRIVATE_KEY ?? '',
+  wechatApiV3Key: process.env.WECHAT_API_V3_KEY ?? '',
+  alipayAppId: process.env.ALIPAY_APP_ID ?? '',
+  alipayPrivateKey: process.env.ALIPAY_PRIVATE_KEY ?? '',
+  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY ?? '',
+  payNotifyBase: process.env.PAY_NOTIFY_BASE ?? '',
   adminUsernames: (process.env.ADMIN_USERNAMES ?? 'dev')
     .split(',')
     .map((name) => name.trim())

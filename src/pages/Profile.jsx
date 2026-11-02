@@ -42,7 +42,7 @@ export function ProfilePage() {
     navigate('/login', { replace: true })
   }
 
-  const username = stats?.username ?? user?.username ?? ''
+  const username = user?.nickname || stats?.username || user?.username || ''
   const joined = formatJoined(stats?.createdAt ?? user?.createdAt)
   const maxCleared = stats?.maxCleared ?? 0
   const totalGames = stats?.totalGames ?? 0
@@ -125,8 +125,23 @@ export function ProfilePage() {
       ) : null}
 
       <div className="account-card">
-        <Link className="account-link" to="/profile/password">
-          <span>修改密码</span>
+        <p className="muted">
+          {user?.isGuest ? '游客账号' : '正式账号'}
+          {user?.phone ? ` · ${user.phone}` : ' · 未绑手机号'}
+          {user?.hasOpenid ? ' · 已绑微信' : ' · 未绑微信'}
+        </p>
+        <Link className="account-link" to="/profile/bind">
+          <span>账号绑定</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        {user?.hasPassword ? (
+          <Link className="account-link" to="/profile/password">
+            <span>修改密码</span>
+            <span aria-hidden="true">›</span>
+          </Link>
+        ) : null}
+        <Link className="account-link" to="/settings">
+          <span>设置</span>
           <span aria-hidden="true">›</span>
         </Link>
         <button type="button" className="account-link account-logout" onClick={handleLogout}>

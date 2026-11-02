@@ -1,13 +1,45 @@
-const STORE_KEY = 'hm-sound'
-const MELODY = [523.25, 659.25, 783.99, 659.25, 880, 783.99, 659.25, 587.33]
-const BEAT = 0.52
+const MUSIC_KEY = 'hm-music'
+const SFX_KEY = 'hm-sfx'
 
-// 音效只由后台的全站开关决定。默认先静音，等设置拉回来再播。
+// 后台开关是总闸。玩家只能在总闸打开时，再分开关音乐和音效。
 let siteSound = false
+
+function readPref(key) {
+  try {
+    const value = localStorage.getItem(key)
+    if (value == null) return true
+    return value === '1'
+  } catch {
+    return true
+  }
+}
+
+function writePref(key, on) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0')
+  } catch {
+    // 存不下就只在这次页面里生效
+  }
+}
+
+export function playerAudio() {
+  return { music: readPref(MUSIC_KEY), sfx: readPref(SFX_KEY), site: siteSound }
+}
+
+export function musicEnabled() {
+  return siteSound && readPref(MUSIC_KEY)
+}
+
+export function sfxEnabled() {
+  return siteSound && readPref(SFX_KEY)
+}
 
 export function soundEnabled() {
   return siteSound
 }
+
+const MELODY = [523.25, 659.25, 783.99, 659.25, 880, 783.99, 659.25, 587.33]
+const BEAT = 0.52
 
 function makeWav() {
   const rate = 22050
@@ -62,7 +94,7 @@ function bgmElement() {
   el.src = URL.createObjectURL(makeWav())
   // 兜底：不管是谁把它放出来的，只要开关是关的就立刻按回去
   el.addEventListener('play', () => {
-    if (!soundEnabled()) el.pause()
+    if (!musicEnabled()) el.pause()
   })
   document.body.appendChild(el)
   window.__hmBgmEl = el
@@ -77,7 +109,7 @@ function stopBgm() {
 }
 
 function startBgm() {
-  if (!soundEnabled()) {
+  if (!musicEnabled()) {
     stopBgm()
     return
   }
@@ -87,7 +119,7 @@ function startBgm() {
   el.play()
     .then(() => {
       // play() 落地要等几十毫秒，期间开关可能已经被关掉了
-      if (!soundEnabled()) stopBgm()
+      if (!musicEnabled()) stopBgm()
     })
     .catch(() => {
       // 还没拿到用户手势，等下一次点击再试
@@ -95,7 +127,7 @@ function startBgm() {
 }
 
 function sync() {
-  if (soundEnabled()) startBgm()
+  if (musicEnabled()) startBgm()
   else stopBgm()
 }
 
@@ -111,7 +143,7 @@ function bindGesture() {
   }
   const onGesture = (event) => {
     const target = event.target
-    if (!soundEnabled()) return
+    if (!musicEnabled()) return
     startBgm()
   }
   window.__hmOnGesture = onGesture
@@ -122,7 +154,7 @@ function bindGesture() {
   if (!window.__hmWeixin) {
     window.__hmWeixin = true
     document.addEventListener('WeixinJSBridgeReady', () => {
-      if (soundEnabled()) startBgm()
+      if (musicEnabled()) startBgm()
     }, false)
   }
 }
@@ -132,12 +164,16 @@ sync()
 
 export function setSiteSound(enabled) {
   siteSound = enabled !== false
-  try {
-    localStorage.removeItem(STORE_KEY)
-  } catch {
-    // 旧的个人开关清不掉也没关系，播放已经不再读它
-  }
   sync()
+}
+
+export function setMusicEnabled(on) {
+  writePref(MUSIC_KEY, on)
+  sync()
+}
+
+export function setSfxEnabled(on) {
+  writePref(SFX_KEY, on)
 }
 
 // 音效共用一个 AudioContext，Chrome 单页最多只给 6 个，一次一个很快就抛错
@@ -158,7 +194,7 @@ function context() {
 }
 
 export function playSound(kind) {
-  if (!soundEnabled()) return
+  if (!sfxEnabled()) return
   const current = context()
   if (!current) return
   const notes = { swap: [523], pop: [659, 784], fail: [196], win: [523, 659, 784], tool: [440, 554] }

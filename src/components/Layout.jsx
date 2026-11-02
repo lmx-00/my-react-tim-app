@@ -3,8 +3,11 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { getTheme } from '../api/game.js'
 import { applyTheme } from '../game/theme.js'
 import { setSiteSound } from '../game/sound.js'
+import { rememberWechat } from '../auth/wechat.js'
 import { useAuth } from '../auth/useAuth.js'
 import { Landscape } from './Landscape.jsx'
+import { WalletStrip } from './WalletStrip.jsx'
+import { Dock } from './Dock.jsx'
 
 export function Layout({ children }) {
   const { isLoggedIn, user, saveAvatar } = useAuth()
@@ -24,8 +27,8 @@ export function Layout({ children }) {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
+    rememberWechat(location.search)
     const wxAvatar = params.get('wxAvatar')
-    if (wxAvatar) sessionStorage.setItem('wx-avatar', wxAvatar)
     if (!isLoggedIn) return
     const avatar = wxAvatar || sessionStorage.getItem('wx-avatar')
     if (!avatar || avatar === user?.avatarUrl) return
@@ -35,15 +38,18 @@ export function Layout({ children }) {
   }, [isLoggedIn, location.search, saveAvatar, user?.avatarUrl])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isLoggedIn && !inGame ? ' has-dock' : ''}`}>
       <Landscape />
       {inGame ? null : (
+      <div className="sticky-top">
       <header className="topbar">
         <Link to={isLoggedIn ? '/' : '/login'} className="brand">
           开心消消乐
         </Link>
         <nav className="nav">
           <NavLink to="/levels">关卡</NavLink>
+          <NavLink to="/shop">商店</NavLink>
+          <NavLink to="/bag">背包</NavLink>
           <NavLink to="/rank">排行</NavLink>
           <NavLink to="/records">记录</NavLink>
           <NavLink to="/profile">我的</NavLink>
@@ -53,7 +59,7 @@ export function Layout({ children }) {
           {isLoggedIn ? (
             <span className="topbar-user">
               {user.avatarUrl ? <img className="topbar-avatar" src={user.avatarUrl} alt="" /> : null}
-              {user.username}
+              {user.nickname || user.username}
             </span>
           ) : (
             <>
@@ -65,8 +71,12 @@ export function Layout({ children }) {
           )}
         </div>
       </header>
+      {isLoggedIn ? <WalletStrip /> : null}
+      </div>
       )}
+      {inGame && isLoggedIn ? <WalletStrip /> : null}
       <main className={`page${inGame ? ' is-game' : ''}`}>{children}</main>
+      {isLoggedIn && !inGame ? <Dock /> : null}
     </div>
   )
 }

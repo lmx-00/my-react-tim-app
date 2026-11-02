@@ -1,14 +1,20 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { refreshCookieOptions } from '../lib/jwt.js'
-import { loginSchema, passwordChangeSchema, registerSchema } from '../lib/schemas.js'
+import { loginSchema, passwordChangeSchema, phoneAuthSchema, phoneLoginSchema, registerSchema, wechatAuthSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { authRequired } from '../middleware/auth.js'
 import {
+  bindPhone,
+  bindWechat,
   changePassword,
   issueAuth,
+  loginGuest,
+  loginPhone,
   loginUser,
+  loginWechat,
   logoutRefreshToken,
+  registerPhone,
   registerUser,
   rotateRefreshToken,
 } from '../services/authService.js'
@@ -32,6 +38,59 @@ authRouter.post(
     const user = await loginUser(body)
     const data = await issueAuth(res, user)
     ok(res, data)
+  }),
+)
+
+authRouter.post(
+  '/register/phone',
+  asyncHandler(async (req, res) => {
+    const body = parseWith(phoneAuthSchema, req.body)
+    const user = await registerPhone(body)
+    ok(res, await issueAuth(res, user), 201)
+  }),
+)
+
+authRouter.post(
+  '/login/phone',
+  asyncHandler(async (req, res) => {
+    const body = parseWith(phoneLoginSchema, req.body)
+    const user = await loginPhone(body)
+    ok(res, await issueAuth(res, user))
+  }),
+)
+
+authRouter.post(
+  '/guest',
+  asyncHandler(async (req, res) => {
+    const user = await loginGuest()
+    ok(res, await issueAuth(res, user), 201)
+  }),
+)
+
+authRouter.post(
+  '/wechat',
+  asyncHandler(async (req, res) => {
+    const body = parseWith(wechatAuthSchema, req.body ?? {})
+    const user = await loginWechat(body)
+    ok(res, await issueAuth(res, user))
+  }),
+)
+
+authRouter.post(
+  '/bind/phone',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(phoneAuthSchema, req.body)
+    ok(res, await bindPhone(req.user.id, body))
+  }),
+)
+
+authRouter.post(
+  '/bind/wechat',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(wechatAuthSchema, req.body ?? {})
+    ok(res, await bindWechat(req.user.id, body))
   }),
 )
 

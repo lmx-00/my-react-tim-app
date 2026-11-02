@@ -28,3 +28,27 @@ export function changePasswordRequest(oldPassword, newPassword) {
 export function saveAvatarRequest(avatarUrl) {
   return api('/me/avatar', { method: 'POST', body: { avatarUrl } })
 }
+
+export function registerPhoneRequest(phone, password) {
+  return api('/auth/register/phone', { method: 'POST', body: { phone, password } })
+}
+
+export function loginPhoneRequest(phone, password) {
+  return api('/auth/login/phone', { method: 'POST', body: { phone, password } })
+}
+
+export function guestLoginRequest() {
+  return api('/auth/guest', { method: 'POST' })
+}
+
+export function wechatLoginRequest(body) {
+  return api('/auth/wechat', { method: 'POST', body })
+}
+
+export function bindPhoneRequest(phone, password) {
+  return api('/auth/bind/phone', { method: 'POST', body: { phone, password } })
+}
+
+export function bindWechatRequest(body) {
+  return api('/auth/bind/wechat', { method: 'POST', body })
+}

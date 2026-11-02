@@ -190,4 +190,30 @@ describe('match-3 engine', () => {
     applySwap(board, { x1: 0, y1: 0, x2: 1, y2: 0 }, { colorCount: 5 }, rng)
     assert.deepEqual(board, snapshot)
   })
+
+  it('refuses to drag a frozen animal', () => {
+    const board = boardFrom([
+      [{ type: 'bear', ice: 1 }, 'cat', 'fox', 'frog'],
+      ['cat', 'fox', 'frog', 'owl'],
+      ['fox', 'frog', 'owl', 'bear'],
+      ['frog', 'owl', 'bear', 'cat'],
+    ])
+    const result = applySwap(board, { x1: 0, y1: 0, x2: 1, y2: 0 }, { colorCount: 6 }, createRng(1))
+    assert.equal(result.valid, false)
+    assert.equal(board.cells[0][0].type, 'bear')
+    assert.equal(board.cells[0][0].ice, 1)
+  })
+
+  it('cracks one ice layer beside a match and leaves the animal in place', () => {
+    const board = boardFrom([
+      ['fox', { type: 'owl', ice: 2 }, 'chick', 'frog'],
+      ['bear', 'cat', 'bear', 'bear'],
+    ])
+    const rng = () => 0.2
+    rng.getState = () => '1'
+    const result = applySwap(board, { x1: 0, y1: 1, x2: 1, y2: 1 }, { colorCount: 6 }, rng)
+    assert.equal(result.valid, true)
+    assert.equal(result.board.cells[0][1].type, 'owl')
+    assert.equal(result.board.cells[0][1].ice, 1)
+  })
 })

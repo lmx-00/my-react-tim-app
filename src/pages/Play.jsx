@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createSession, playMove, quitSession, undoMove, useHammer, useShuffle } from '../api/game.js'
+import { createSession, playMove, quitSession, undoMove, useHammer, useShuffle, useSwap } from '../api/game.js'
 import { Board } from '../components/Board.jsx'
+import { ResultDialog } from '../components/ResultDialog.jsx'
 import { buildFrames } from '../game/replay.js'
 import { playSound } from '../game/sound.js'
 import { goalProgressText, goalText } from '../game/tiles.js'
@@ -30,6 +31,7 @@ export function PlayPage() {
   const [view, setView] = useState(null)
   const [combo, setCombo] = useState(null)
   const [tool, setTool] = useState(null)
+  const [paused, setPaused] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -108,6 +110,8 @@ export function PlayPage() {
           stars: result.stars,
           canUndo: result.canUndo,
           tools: result.tools ?? current.tools,
+          rewardCoins: result.rewardCoins ?? 0,
+          rewardTools: result.rewardTools ?? {},
         }))
 
       if (!result.valid) {
@@ -128,9 +132,6 @@ export function PlayPage() {
         setCombo(null)
         applyResult()
       }
-      if (result.status === 'won' || result.status === 'lost') {
-        navigate(`/result/${session.sessionId}`, { replace: true })
-      }
     } catch (err) {
       setSwap(null)
       setView(null)
@@ -142,9 +143,21 @@ export function PlayPage() {
   }
 
   function handleSelect(cell) {
-    if (busy || !session || session.status !== 'playing') return
+    if (busy || paused || !session || session.status !== 'playing') return
     if (tool === 'hammer') {
       hammerTile(cell)
+      return
+    }
+    if (tool === 'swap') {
+      if (!selected) {
+        setSelected(cell)
+        return
+      }
+      if (selected.x === cell.x && selected.y === cell.y) {
+        setSelected(null)
+        return
+      }
+      swapWithTool(selected, cell)
       return
     }
     if (!selected) {
@@ -173,9 +186,35 @@ export function PlayPage() {
       setView(null)
       setCombo(null)
       setSession((current) => ({ ...current, ...result }))
-      if (result.status === 'won' || result.status === 'lost') {
-        navigate(`/result/${session.sessionId}`, { replace: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function swapWithTool(from, to) {
+    if (!session || busy) return
+    setBusy(true)
+    setSelected(null)
+    setTool(null)
+    try {
+      if (isAdjacent(from, to)) {
+        setSwap({ from, to, phase: 'forward' })
+        await wait(SWAP_SETTLE_MS)
+        setSwap(null)
       }
+      const result = await useSwap(session.sessionId, {
+        x1: from.x,
+        y1: from.y,
+        x2: to.x,
+        y2: to.y,
+      })
+      playSound(result.status === 'won' ? 'win' : 'pop')
+      await replay(buildFrames(session.board.cells, result.events ?? []), result.movesLeft)
+      setView(null)
+      setCombo(null)
+      setSession((current) => ({ ...current, ...result }))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -246,6 +285,7 @@ export function PlayPage() {
     )
   }
 
+  const ended = session.status === 'won' || session.status === 'lost'
   const lowMoves = session.movesLeft <= 5
 
   return (
@@ -273,7 +313,7 @@ export function PlayPage() {
           board={view ? { ...session.board, cells: view.cells } : session.board}
           selected={selected}
           onSelect={handleSelect}
-          disabled={busy}
+          disabled={busy || paused || ended}
           shaking={shaking}
           swap={swap}
           effects={view}
@@ -285,14 +325,14 @@ export function PlayPage() {
         ) : null}
       </div>
       <div className="tool-bar">
-        <button type="button" className="btn btn-ghost" onClick={handleUndo} disabled={busy || !session.canUndo}>
+        <button type="button" className="btn btn-ghost" onClick={handleUndo} disabled={busy || ended || !session.canUndo}>
           后退
         </button>
         <button
           type="button"
           className={`btn btn-ghost${tool === 'hammer' ? ' is-on' : ''}`}
           onClick={() => setTool((current) => (current === 'hammer' ? null : 'hammer'))}
-          disabled={busy || !session.tools?.hammer}
+          disabled={busy || ended || !session.tools?.hammer}
         >
           锤子 {session.tools?.hammer ?? 0}
         </button>
@@ -300,17 +340,46 @@ export function PlayPage() {
           type="button"
           className="btn btn-ghost"
           onClick={handleShuffle}
-          disabled={busy || !session.tools?.shuffle}
+          disabled={busy || ended || !session.tools?.shuffle}
         >
           洗牌 {session.tools?.shuffle ?? 0}
         </button>
+        <button
+          type="button"
+          className={`btn btn-ghost${tool === 'swap' ? ' is-on' : ''}`}
+          onClick={() => setTool((current) => (current === 'swap' ? null : 'swap'))}
+          disabled={busy || paused || ended || !session.tools?.swap}
+        >
+          交换 {session.tools?.swap ?? 0}
+        </button>
       </div>
-      {tool === 'hammer' ? <p className="muted">点一个格子，把它敲掉。不扣步数。</p> : null}
+      {tool === 'hammer' ? <p className="muted">结冰的小动物拖不动。锤子敲一下只碎一层冰，小动物还在。不扣步数。</p> : null}
+      {tool === 'swap' ? <p className="muted">点两个没结冰的格子对调。消得掉就消除，消不掉也留在新位置。不扣步数。</p> : null}
       <div className="actions">
+        <button type="button" className="btn btn-ghost" onClick={() => setPaused(true)} disabled={busy || ended}>
+          暂停
+        </button>
         <button type="button" className="btn btn-ghost" onClick={handleQuit} disabled={busy}>
           返回关卡
         </button>
       </div>
+      {paused && !ended ? (
+        <div className="cashier-mask">
+          <section className="cashier" role="dialog" aria-label="暂停">
+            <h2>已暂停</h2>
+            <p className="muted">棋盘先停在这里。</p>
+            <div className="actions">
+              <button type="button" className="btn" onClick={() => setPaused(false)}>
+                继续
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={handleQuit}>
+                返回关卡
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {ended ? <ResultDialog session={session} /> : null}
     </section>
   )
 }

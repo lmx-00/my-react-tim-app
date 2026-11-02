@@ -157,7 +157,7 @@ export function RecordsPage() {
               </div>
               <div className="record-side">
                 <time dateTime={item.endedAt ?? undefined}>{formatTime(item.endedAt)}</time>
-                <Link to={`/play/${item.levelId}`}>再玩一次</Link>
+                <Link to={`/load/${item.levelId}`}>再玩一次</Link>
               </div>
             </li>
           ))}
