@@ -141,8 +141,7 @@ function bindGesture() {
     window.removeEventListener('click', previous, false)
     window.removeEventListener('keyup', previous, false)
   }
-  const onGesture = (event) => {
-    const target = event.target
+  const onGesture = () => {
     if (!musicEnabled()) return
     startBgm()
   }

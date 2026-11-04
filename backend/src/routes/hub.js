@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { authRequired } from '../middleware/auth.js'
-import { buyOffer, checkIn, claimAllMail, claimEvent, claimMail, claimTask, createRecharge, getActivity, getBag, getShop, listMail, loadWallet, startCheckout } from '../services/walletService.js'
+import { buyOffer, checkIn, claimAllMail, claimEvent, claimMail, claimTask, createRecharge, deleteMail, getActivity, getBag, getShop, listMail, loadWallet, startCheckout } from '../services/walletService.js'
 
 export const hubRouter = Router()
 
@@ -44,6 +44,10 @@ hubRouter.post('/mail/claim-all', asyncHandler(async (req, res) => {
 
 hubRouter.post('/mail/:id/claim', asyncHandler(async (req, res) => {
   ok(res, await claimMail(req.user.id, req.params.id))
+}))
+
+hubRouter.delete('/mail/:id', asyncHandler(async (req, res) => {
+  ok(res, await deleteMail(req.user.id, req.params.id))
 }))
 
 hubRouter.get('/activity', asyncHandler(async (req, res) => {

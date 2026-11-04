@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { listLevels } from '../api/game.js'
+import { NO_STAMINA_TEXT, listLevels, staminaBlocked } from '../api/game.js'
 import { Stars } from '../components/Stars.jsx'
 import { goalText } from '../game/tiles.js'
 
@@ -39,6 +39,7 @@ export function LevelsPage() {
   const location = useLocation()
   const scrollerRef = useRef(null)
   const [levels, setLevels] = useState([])
+  const [playingLevelIds, setPlayingLevelIds] = useState([])
   const [range, setRange] = useState({ start: 0, end: 16 })
   const [away, setAway] = useState(null)
   const [error, setError] = useState(location.state?.notice ?? '')
@@ -67,6 +68,7 @@ export function LevelsPage() {
       .then((data) => {
         if (cancelled) return
         setLevels(data.levels)
+        setPlayingLevelIds(data.playingLevelIds ?? [])
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -105,12 +107,21 @@ export function LevelsPage() {
     node.scrollTo({ top: Math.max(0, index * STEP - node.clientHeight * 0.32), behavior: 'smooth' })
   }
 
-  function openLevel(level) {
+  async function openLevel(level) {
     if (level.status === 'locked') {
       setError('请先通过上一关')
       return
     }
     setError('')
+    try {
+      if (await staminaBlocked(level.id, playingLevelIds)) {
+        setError(NO_STAMINA_TEXT)
+        return
+      }
+    } catch (err) {
+      setError(err.message)
+      return
+    }
     navigate(`/load/${level.id}`)
   }
 

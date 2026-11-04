@@ -8,13 +8,10 @@ export function SettingsPage() {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [site, setSite] = useState(true)
-  const [music, setMusic] = useState(true)
-  const [sfx, setSfx] = useState(true)
+  const [music, setMusic] = useState(() => playerAudio().music)
+  const [sfx, setSfx] = useState(() => playerAudio().sfx)
 
   useEffect(() => {
-    const prefs = playerAudio()
-    setMusic(prefs.music)
-    setSfx(prefs.sfx)
     getTheme()
       .then((data) => setSite(data.sound !== false))
       .catch(() => {})

@@ -54,11 +54,18 @@ export function publicLevel(level, progress) {
 }
 
 export async function listLevels(userId) {
-  const [levels, progress] = await Promise.all([
+  const [levels, progress, playing] = await Promise.all([
     prisma.level.findMany({ orderBy: { id: 'asc' } }),
     prisma.userProgress.findUnique({ where: { userId } }),
+    prisma.gameSession.findMany({ where: { userId, status: 'playing' } }),
   ])
-  return { levels: levels.map((level) => publicLevel(level, progress)) }
+  const playingLevelIds = playing
+    .filter((item) => expireIfNeeded({ ...item }).status === 'playing')
+    .map((item) => item.levelId)
+  return {
+    levels: levels.map((level) => publicLevel(level, progress)),
+    playingLevelIds,
+  }
 }
 
 export async function getLevel(userId, levelId) {
@@ -81,16 +88,21 @@ function expireIfNeeded(session) {
   return session
 }
 
+// 过期按最后一次操作算用时，挂着没动的那段不算；结束时间记成真正过期的那一刻
+function expiredClose(session) {
+  const last = new Date(session.lastMoveAt).getTime()
+  return {
+    status: 'expired',
+    endedAt: new Date(last + SESSION_TIMEOUT_MS),
+    durationMs: last - new Date(session.startedAt).getTime(),
+  }
+}
+
 async function persistExpired(session) {
   if (session.status !== 'expired' || session.endedAt) return session
-  const endedAt = new Date()
   return prisma.gameSession.update({
     where: { id: session.id },
-    data: {
-      status: 'expired',
-      endedAt,
-      durationMs: endedAt.getTime() - session.startedAt.getTime(),
-    },
+    data: expiredClose(session),
   })
 }
 
@@ -101,11 +113,9 @@ async function closeSessions(sessions) {
     const expired = expireIfNeeded({ ...item }).status === 'expired'
     await prisma.gameSession.update({
       where: { id: item.id },
-      data: {
-        status: expired ? 'expired' : 'quit',
-        endedAt: now,
-        durationMs: now.getTime() - item.startedAt.getTime(),
-      },
+      data: expired
+        ? expiredClose(item)
+        : { status: 'quit', endedAt: now, durationMs: now.getTime() - item.startedAt.getTime() },
     })
   }
 }
@@ -144,10 +154,14 @@ function serializeSession(session, level, bag) {
 function combineTools(sessionTools, bag) {
   const free = normalizeTools(sessionTools)
   const owned = normalizeBag(bag)
+  const total = (key) => free[key] + owned[key]
   return {
-    hammer: free.hammer + owned.hammer,
-    shuffle: free.shuffle + owned.shuffle,
-    swap: free.swap + owned.swap,
+    hammer: total('hammer'),
+    shuffle: total('shuffle'),
+    swap: total('swap'),
+    plus: total('plus'),
+    free,
+    bag: owned,
   }
 }
 
@@ -529,7 +543,11 @@ export async function listLeaderboard(userId, { page = 1, pageSize = 50, scope =
   if (scope === 'friends') {
     rows = rows.filter((row) => row.me || friendIds.has(row.id))
   }
-  rows = rows.map(({ id, ...row }, index) => ({ rank: index + 1, ...row }))
+  rows = rows.map((row, index) => {
+    const item = { rank: index + 1, ...row }
+    delete item.id
+    return item
+  })
 
   const start = (page - 1) * pageSize
   return {
@@ -584,7 +602,7 @@ export async function getThemeSetting() {
   return getSiteSettings()
 }
 
-const SITE_DEFAULTS = { sound: false, undo: true, hammer: 3, shuffle: 1, swap: 1 }
+const SITE_DEFAULTS = { sound: true, undo: true, hammer: 3, shuffle: 1, swap: 1 }
 
 export async function getSiteSettings() {
   const [themeRow, siteRow] = await Promise.all([

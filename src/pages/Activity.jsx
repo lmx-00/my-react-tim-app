@@ -73,7 +73,7 @@ export function ActivityPage() {
       {note ? <p className="muted">{note}</p> : null}
       {!activity ? <p className="muted">活动加载中…</p> : null}
       {activity ? (
-        <>
+        <div className="shop-list activity-scroll">
           <article className="shop-row">
             <div>
               <strong>每日签到</strong>
@@ -92,18 +92,6 @@ export function ActivityPage() {
             </div>
             <strong className="bag-count">{activity.streak}/{activity.streakGoal}</strong>
           </article>
-          {(activity.events ?? []).map((event) => (
-            <article key={event.id} className="shop-row">
-              <div>
-                <strong>{event.name}</strong>
-                <p className="muted">{event.text}</p>
-                <p className="muted">{endsLabel(event.endsAt)}</p>
-              </div>
-              <button type="button" className="btn btn-sm" disabled={event.claimed} onClick={() => claim(event.id)}>
-                {event.claimed ? '已领取' : '领取'}
-              </button>
-            </article>
-          ))}
           {(activity.tasks ?? []).map((task) => (
             <article key={task.id} className="shop-row">
               <div>
@@ -115,7 +103,21 @@ export function ActivityPage() {
               </button>
             </article>
           ))}
-        </>
+          {[...(activity.events ?? [])]
+            .sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0))
+            .map((event) => (
+              <article key={event.id} className="shop-row">
+                <div>
+                  <strong>{event.name}</strong>
+                  <p className="muted">{event.text}</p>
+                  <p className="muted">{endsLabel(event.endsAt)}</p>
+                </div>
+                <button type="button" className="btn btn-sm" disabled={event.claimed} onClick={() => claim(event.id)}>
+                  {event.claimed ? '已领取' : '领取'}
+                </button>
+              </article>
+            ))}
+        </div>
       ) : null}
     </section>
   )

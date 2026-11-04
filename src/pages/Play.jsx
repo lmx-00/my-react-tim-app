@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createSession, playMove, quitSession, undoMove, useHammer, usePlus, useShuffle, useSwap } from '../api/game.js'
+import { applyHammer, applyPlus, applyShuffle, applySwap, createSession, playMove, quitSession, undoMove } from '../api/game.js'
 import { Board } from '../components/Board.jsx'
 import { ResultDialog } from '../components/ResultDialog.jsx'
 import { buildFrames } from '../game/replay.js'
@@ -11,6 +11,19 @@ import { goalProgressText, goalText } from '../game/tiles.js'
 const SWAP_MS = 180
 const SWAP_SETTLE_MS = SWAP_MS + 40
 const STEP_MS = 270
+
+function toolFace(name, tools, key) {
+  const free = tools?.free?.[key]
+  const bag = tools?.bag?.[key] ?? 0
+  if (free == null || bag <= 0) return `${name} ${tools?.[key] ?? 0}`
+  return (
+    <span className="tool-count">
+      <span>{name}</span>
+      <small>本局 {free}</small>
+      <small>背包 {bag}</small>
+    </span>
+  )
+}
 
 function isAdjacent(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
@@ -43,8 +56,8 @@ export function PlayPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        if (err.code === 'LEVEL_LOCKED') {
-          navigate('/levels', { replace: true, state: { notice: '请先通过上一关' } })
+        if (err.code === 'LEVEL_LOCKED' || err.code === 'NO_STAMINA') {
+          navigate('/levels', { replace: true, state: { notice: err.message } })
           return
         }
         setError(err.message)
@@ -181,7 +194,7 @@ export function PlayPage() {
     setSelected(null)
     setTool(null)
     try {
-      const result = await useHammer(session.sessionId, { x: cell.x, y: cell.y })
+      const result = await applyHammer(session.sessionId, { x: cell.x, y: cell.y })
       await replay(buildFrames(session.board.cells, result.events ?? []), result.movesLeft)
       setView(null)
       setCombo(null)
@@ -204,7 +217,7 @@ export function PlayPage() {
         await wait(SWAP_SETTLE_MS)
         setSwap(null)
       }
-      const result = await useSwap(session.sessionId, {
+      const result = await applySwap(session.sessionId, {
         x1: from.x,
         y1: from.y,
         x2: to.x,
@@ -243,7 +256,7 @@ export function PlayPage() {
     setBusy(true)
     setTool(null)
     try {
-      const result = await usePlus(session.sessionId)
+      const result = await applyPlus(session.sessionId)
       setSession((current) => ({ ...current, ...result }))
     } catch (err) {
       setError(err.message)
@@ -257,7 +270,7 @@ export function PlayPage() {
     setBusy(true)
     setTool(null)
     try {
-      const result = await useShuffle(session.sessionId)
+      const result = await applyShuffle(session.sessionId)
       await replay(buildFrames(session.board.cells, result.events ?? []), result.movesLeft)
       setView(null)
       setSession((current) => ({ ...current, ...result }))
@@ -350,7 +363,7 @@ export function PlayPage() {
           onClick={() => setTool((current) => (current === 'hammer' ? null : 'hammer'))}
           disabled={busy || ended || !session.tools?.hammer}
         >
-          锤子 {session.tools?.hammer ?? 0}
+          {toolFace('锤子', session.tools, 'hammer')}
         </button>
         <button
           type="button"
@@ -358,7 +371,7 @@ export function PlayPage() {
           onClick={handleShuffle}
           disabled={busy || ended || !session.tools?.shuffle}
         >
-          洗牌 {session.tools?.shuffle ?? 0}
+          {toolFace('洗牌', session.tools, 'shuffle')}
         </button>
         <button
           type="button"
@@ -366,7 +379,7 @@ export function PlayPage() {
           onClick={() => setTool((current) => (current === 'swap' ? null : 'swap'))}
           disabled={busy || paused || ended || !session.tools?.swap}
         >
-          交换 {session.tools?.swap ?? 0}
+          {toolFace('交换', session.tools, 'swap')}
         </button>
         <button
           type="button"
@@ -374,7 +387,7 @@ export function PlayPage() {
           onClick={handlePlus}
           disabled={busy || ended || !session.tools?.plus}
         >
-          加五步 {session.tools?.plus ?? 0}
+          {toolFace('加五步', session.tools, 'plus')}
         </button>
       </div>
       {tool === 'hammer' ? <p className="muted">结冰的小动物拖不动。锤子敲一下只碎一层冰，小动物还在。不扣步数。</p> : null}

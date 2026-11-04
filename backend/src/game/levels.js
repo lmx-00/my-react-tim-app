@@ -77,7 +77,7 @@ function buildLevel(id) {
   const extra = Math.min(6, Math.floor(id / 160))
   const pattern = id % 4
   let goalType = 'score'
-  let goalPayload = { score: 1600 }
+  let goalPayload
   let moveLimit = breath ? 24 : boss ? 20 : 22
 
   if (pattern === 1 || pattern === 3) {

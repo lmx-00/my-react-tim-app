@@ -47,20 +47,30 @@ export function undoMove(sessionId) {
   return api(`/game/sessions/${sessionId}/undo`, { method: 'POST' })
 }
 
-export function useHammer(sessionId, point) {
+export function applyHammer(sessionId, point) {
   return api(`/game/sessions/${sessionId}/hammer`, { method: 'POST', body: point })
 }
 
-export function useShuffle(sessionId) {
+export function applyShuffle(sessionId) {
   return api(`/game/sessions/${sessionId}/shuffle`, { method: 'POST' })
 }
 
-export function useSwap(sessionId, move) {
+export function applySwap(sessionId, move) {
   return api(`/game/sessions/${sessionId}/swap`, { method: 'POST', body: move })
 }
 
-export function usePlus(sessionId) {
+export function applyPlus(sessionId) {
   return api(`/game/sessions/${sessionId}/plus`, { method: 'POST' })
+}
+
+export const NO_STAMINA_TEXT = '体力不足，过一会儿会恢复，也可以去商店补充'
+
+// 体力用完时，只有这一关还开着没下完的对局才能进去接着玩
+export async function staminaBlocked(levelId, playingLevelIds) {
+  const wallet = await getWallet()
+  if (wallet.stamina > 0) return false
+  const playing = playingLevelIds ?? (await listLevels()).playingLevelIds ?? []
+  return !playing.includes(Number(levelId))
 }
 
 export function getLeaderboard({ page = 1, pageSize = 50, scope = 'all', levelId } = {}) {
@@ -126,6 +136,10 @@ export function claimMail(id) {
 
 export function claimAllMail() {
   return api('/mail/claim-all', { method: 'POST' })
+}
+
+export function deleteMail(id) {
+  return api(`/mail/${id}`, { method: 'DELETE' })
 }
 
 export function checkIn() {

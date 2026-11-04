@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { NO_STAMINA_TEXT, staminaBlocked } from '../api/game.js'
 import { Stars } from './Stars.jsx'
 
 const STATUS_TEXT = {
@@ -19,10 +20,26 @@ function toolText(tools) {
 }
 
 export function ResultDialog({ session }) {
+  const navigate = useNavigate()
   const [shareNote, setShareNote] = useState('')
+  const [blocked, setBlocked] = useState('')
   const won = session.status === 'won'
   const nextId = session.nextLevelId
   const tools = toolText(session.rewardTools)
+
+  async function enter(levelId) {
+    setBlocked('')
+    try {
+      if (await staminaBlocked(levelId)) {
+        setBlocked(NO_STAMINA_TEXT)
+        return
+      }
+    } catch (err) {
+      setBlocked(err.message)
+      return
+    }
+    navigate(`/load/${levelId}`)
+  }
 
   async function share() {
     const text = won
@@ -60,15 +77,16 @@ export function ResultDialog({ session }) {
         {session.rewardCoins ? <p>获得 {session.rewardCoins} 金币</p> : null}
         {tools ? <p>获得 {tools}</p> : null}
         {shareNote ? <p className="muted">{shareNote}</p> : null}
+        {blocked ? <p className="form-error">{blocked}</p> : null}
         <div className="actions">
           {won && nextId ? (
-            <Link to={`/load/${nextId}`} className="btn">
+            <button type="button" className="btn" onClick={() => enter(nextId)}>
               下一关
-            </Link>
+            </button>
           ) : null}
-          <Link to={`/load/${session.level.id}`} className="btn btn-ghost">
+          <button type="button" className="btn btn-ghost" onClick={() => enter(session.level.id)}>
             再玩一次
-          </Link>
+          </button>
           <button type="button" className="btn btn-ghost" onClick={share}>
             分享
           </button>

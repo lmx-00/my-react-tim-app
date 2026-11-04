@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { listRecords } from '../api/game.js'
+import { Link, useNavigate } from 'react-router-dom'
+import { NO_STAMINA_TEXT, listRecords, staminaBlocked } from '../api/game.js'
 import { Stars } from '../components/Stars.jsx'
 
 const PAGE_SIZE = 10
@@ -40,6 +40,8 @@ function formatTime(value) {
 }
 
 export function RecordsPage() {
+  const navigate = useNavigate()
+  const [blocked, setBlocked] = useState(null)
   const [data, setData] = useState(null)
   const [filter, setFilter] = useState('')
   const [levelId, setLevelId] = useState('')
@@ -87,6 +89,20 @@ export function RecordsPage() {
   function goPage(next) {
     setLoading(true)
     setPage(next)
+  }
+
+  async function playAgain(item) {
+    setBlocked(null)
+    try {
+      if (await staminaBlocked(item.levelId)) {
+        setBlocked({ id: item.id, text: NO_STAMINA_TEXT })
+        return
+      }
+    } catch (err) {
+      setBlocked({ id: item.id, text: err.message })
+      return
+    }
+    navigate(`/load/${item.levelId}`)
   }
 
   const items = data?.items ?? []
@@ -154,10 +170,13 @@ export function RecordsPage() {
                   得分 {item.score} · 步数 {item.moveCount}/{item.moveLimit} · 用时{' '}
                   {formatDuration(item.durationMs)}
                 </p>
+                {blocked?.id === item.id ? <p className="form-error">{blocked.text}</p> : null}
               </div>
               <div className="record-side">
                 <time dateTime={item.endedAt ?? undefined}>{formatTime(item.endedAt)}</time>
-                <Link to={`/load/${item.levelId}`}>再玩一次</Link>
+                <button type="button" className="link-btn" onClick={() => playAgain(item)}>
+                  再玩一次
+                </button>
               </div>
             </li>
           ))}

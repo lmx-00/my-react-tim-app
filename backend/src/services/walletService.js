@@ -11,14 +11,24 @@ function asList(value) {
 async function ensureWelcome(userId) {
   const count = await prisma.mail.count({ where: { userId } })
   if (count > 0) return
-  await prisma.mail.create({
-    data: {
-      userId,
-      title: '欢迎来到开心消消乐',
-      body: '送你一点金币和钻石，可以在商店换成体力和礼包。',
-      reward: { coins: 200, diamonds: 30 },
-    },
-  })
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) return
+  const claimed = asList(user.claimedOffers)
+  if (claimed.includes('welcome-mail')) return
+  await prisma.$transaction([
+    prisma.mail.create({
+      data: {
+        userId,
+        title: '欢迎来到开心消消乐',
+        body: '送你一点金币和钻石，可以在商店换成体力和礼包。',
+        reward: { coins: 200, diamonds: 30 },
+      },
+    }),
+    prisma.user.update({
+      where: { id: userId },
+      data: { claimedOffers: [...claimed, 'welcome-mail'] },
+    }),
+  ])
 }
 
 export async function loadWallet(userId) {
@@ -205,6 +215,21 @@ export async function claimAllMail(userId) {
   return listMail(userId)
 }
 
+export async function deleteMail(userId, mailId) {
+  const mail = await prisma.mail.findUnique({ where: { id: mailId } })
+  if (!mail || mail.userId !== userId) throw new AppError(404, 'MAIL_NOT_FOUND', '邮件不存在')
+  if (!mail.claimed) throw new AppError(400, 'MAIL_UNCLAIMED', '还没领取的邮件不能删除')
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  const claimed = asList(user?.claimedOffers)
+  await prisma.$transaction([
+    prisma.mail.delete({ where: { id: mail.id } }),
+    ...(claimed.includes('welcome-mail')
+      ? []
+      : [prisma.user.update({ where: { id: userId }, data: { claimedOffers: [...claimed, 'welcome-mail'] } })]),
+  ])
+  return listMail(userId)
+}
+
 function dayKey(date) {
   const value = new Date(date)
   return `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`
@@ -251,13 +276,16 @@ export async function getActivity(userId) {
     streak: wallet.streak,
     streakGoal: STREAK_GOAL,
     streakBonus: STREAK_BONUS,
-    events: liveEvents().map((event) => ({
-      id: event.id,
-      name: event.name,
-      text: event.text,
-      endsAt: event.endsAt,
-      claimed: claimed.includes(event.id),
-    })),
+    events: liveEvents()
+      .sort((a, b) => new Date(b.start) - new Date(a.start))
+      .map((event) => ({
+        id: event.id,
+        name: event.name,
+        text: event.text,
+        start: event.start,
+        endsAt: event.endsAt,
+        claimed: claimed.includes(event.id),
+      })),
     tasks: DAILY_TASKS.map((task) => ({
       ...task,
       done: progress[task.id] > 0,

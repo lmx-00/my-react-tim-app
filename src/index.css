@@ -665,6 +665,27 @@ p {
   gap: 10px;
 }
 
+.activity-scroll {
+  max-height: calc(100dvh - 300px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(226, 75, 147, 0.35) transparent;
+}
+
+.activity-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.activity-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.activity-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(226, 75, 147, 0.35);
+}
+
 .shop-row {
   display: flex;
   align-items: center;
@@ -678,6 +699,38 @@ p {
 
 .shop-row .btn {
   flex: none;
+}
+
+.mail-swipe {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.mail-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 76px;
+  border: 0;
+  background: #ff4d6d;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mail-front {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+  transition: transform 0.18s ease;
+}
+
+.mail-front.is-dragging {
+  transition: none;
+  user-select: none;
 }
 
 .friend-add {
@@ -1438,7 +1491,7 @@ p {
 
 .play-stack .tool-bar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .play-stack .tool-bar .btn,
@@ -1447,6 +1500,25 @@ p {
   padding: 0 8px;
   box-shadow: none;
   font-size: 14px;
+}
+
+.tool-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.tool-count small {
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.play-stack .tool-bar .btn:has(.tool-count) {
+  min-height: 52px;
+  padding: 4px 4px;
 }
 
 .play-stack .actions {
