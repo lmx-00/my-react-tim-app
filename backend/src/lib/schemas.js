@@ -32,6 +32,15 @@ export const phoneLoginSchema = z.object({
   password: z.string().min(1, '请输入密码'),
 })
 
+export const phoneCodeSchema = z.object({
+  phone: phoneSchema,
+  code: z.string().regex(/^\d{6}$/, '请输入 6 位验证码'),
+})
+
+export const phoneSendSchema = z.object({
+  phone: phoneSchema,
+})
+
 export const wechatAuthSchema = z.object({
   code: z.string().min(1).max(128).optional(),
   openid: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/, '微信身份不正确').optional(),

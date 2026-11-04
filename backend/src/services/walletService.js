@@ -1,4 +1,4 @@
-import { BAG, CANDY_WEEK, CHECK_IN_COINS, RECHARGE, SHOP, STAMINA_MAX, STAMINA_REGEN_MS, STREAK_BONUS, STREAK_GOAL, WIN_COINS } from '../game/economy.js'
+import { BAG, CHECK_IN_COINS, DAILY_TASKS, EVENTS, RECHARGE, SHOP, STAMINA_MAX, STAMINA_REGEN_MS, STREAK_BONUS, STREAK_GOAL, WIN_COINS } from '../game/economy.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import crypto from 'crypto'
@@ -42,7 +42,14 @@ export async function loadWallet(userId) {
   }
 
   const unread = await prisma.mail.count({ where: { userId, claimed: false } })
-  const checkedIn = user.lastCheckIn && new Date(user.lastCheckIn).toDateString() === new Date().toDateString()
+  const checkedIn = Boolean(user.lastCheckIn && new Date(user.lastCheckIn).toDateString() === new Date().toDateString())
+  const claimed = asList(user.claimedOffers)
+  const progress = await todayProgress(userId)
+  const today = dayKey(new Date())
+  const activity =
+    (checkedIn ? 0 : 1) +
+    liveEvents().filter((event) => !claimed.includes(event.id)).length +
+    DAILY_TASKS.filter((task) => progress[task.id] && !claimed.includes(`task-${task.id}-${today}`)).length
   return {
     stamina,
     staminaMax: STAMINA_MAX,
@@ -50,7 +57,9 @@ export async function loadWallet(userId) {
     coins: user.coins,
     diamonds: user.diamonds,
     unread,
-    checkedIn: Boolean(checkedIn),
+    activity,
+    notices: unread + activity,
+    checkedIn,
     checkInCoins: CHECK_IN_COINS,
     streak: user.checkStreak ?? 0,
   }
@@ -91,6 +100,7 @@ export function normalizeBag(tools) {
     hammer: count(tools?.hammer),
     shuffle: count(tools?.shuffle),
     swap: count(tools?.swap),
+    plus: count(tools?.plus),
   }
 }
 
@@ -206,33 +216,53 @@ function yesterdayKey(date) {
   return dayKey(value)
 }
 
-export function liveEvent(now = new Date()) {
-  const start = new Date(CANDY_WEEK.start)
-  const end = new Date(start.getTime() + CANDY_WEEK.days * 24 * 60 * 60 * 1000)
-  if (now < start || now >= end) return null
-  return { ...CANDY_WEEK, endsAt: end.toISOString() }
+export function liveEvents(now = new Date()) {
+  return EVENTS.flatMap((event) => {
+    const start = new Date(event.start)
+    const end = new Date(start.getTime() + event.days * 24 * 60 * 60 * 1000)
+    if (now < start || now >= end) return []
+    return [{ ...event, endsAt: end.toISOString() }]
+  })
+}
+
+async function todayProgress(userId) {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const sessions = await prisma.gameSession.findMany({
+    where: { userId, startedAt: { gte: start } },
+    select: { status: true, score: true },
+  })
+  return {
+    play: sessions.length > 0 ? 1 : 0,
+    win: sessions.some((item) => item.status === 'won') ? 1 : 0,
+    score: sessions.some((item) => item.score >= 1000) ? 1 : 0,
+  }
 }
 
 export async function getActivity(userId) {
   const wallet = await loadWallet(userId)
   const user = await prisma.user.findUnique({ where: { id: userId } })
-  const event = liveEvent()
   const claimed = asList(user?.claimedOffers)
+  const progress = await todayProgress(userId)
+  const today = dayKey(new Date())
   return {
     checkedIn: wallet.checkedIn,
     checkInCoins: wallet.checkInCoins,
     streak: wallet.streak,
     streakGoal: STREAK_GOAL,
     streakBonus: STREAK_BONUS,
-    event: event
-      ? {
-          id: event.id,
-          name: event.name,
-          text: event.text,
-          endsAt: event.endsAt,
-          claimed: claimed.includes(event.id),
-        }
-      : null,
+    events: liveEvents().map((event) => ({
+      id: event.id,
+      name: event.name,
+      text: event.text,
+      endsAt: event.endsAt,
+      claimed: claimed.includes(event.id),
+    })),
+    tasks: DAILY_TASKS.map((task) => ({
+      ...task,
+      done: progress[task.id] > 0,
+      claimed: claimed.includes(`task-${task.id}-${today}`),
+    })),
   }
 }
 
@@ -257,13 +287,28 @@ export async function checkIn(userId) {
 }
 
 export async function claimEvent(userId, eventId) {
-  const event = liveEvent()
-  if (!event || event.id !== eventId) throw new AppError(404, 'OFFER_NOT_FOUND', '活动不在进行中')
+  const event = liveEvents().find((item) => item.id === eventId)
+  if (!event) throw new AppError(404, 'OFFER_NOT_FOUND', '活动不在进行中')
   const user = await prisma.user.findUnique({ where: { id: userId } })
   const claimed = asList(user.claimedOffers)
   if (claimed.includes(event.id)) throw new AppError(409, 'ALREADY_CLAIMED', '这个活动已经领过了')
   const data = { claimedOffers: [...claimed, event.id] }
   applyReward(data, event.reward, user)
+  await prisma.user.update({ where: { id: userId }, data })
+  return getActivity(userId)
+}
+
+export async function claimTask(userId, taskId) {
+  const task = DAILY_TASKS.find((item) => item.id === taskId)
+  if (!task) throw new AppError(404, 'OFFER_NOT_FOUND', '没有这个任务')
+  const progress = await todayProgress(userId)
+  if (!progress[task.id]) throw new AppError(400, 'NOT_READY', '这个任务还没完成')
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  const key = `task-${task.id}-${dayKey(new Date())}`
+  const claimed = asList(user.claimedOffers)
+  if (claimed.includes(key)) throw new AppError(409, 'ALREADY_CLAIMED', '今天已经领过了')
+  const data = { claimedOffers: [...claimed, key] }
+  applyReward(data, task.reward, user)
   await prisma.user.update({ where: { id: userId }, data })
   return getActivity(userId)
 }

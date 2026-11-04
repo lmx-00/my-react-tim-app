@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getStats, listLevels } from '../api/game.js'
+import { getStats, getWallet, listLevels } from '../api/game.js'
 import { useAuth } from '../auth/useAuth.js'
 
 function formatJoined(value) {
@@ -17,14 +17,16 @@ export function ProfilePage() {
   const [totalLevels, setTotalLevels] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [wallet, setWallet] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getStats(), listLevels()])
-      .then(([statsData, levelsData]) => {
+    Promise.all([getStats(), listLevels(), getWallet().catch(() => null)])
+      .then(([statsData, levelsData, walletData]) => {
         if (cancelled) return
         setStats(statsData)
         setTotalLevels(levelsData.levels.length)
+        setWallet(walletData)
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -130,6 +132,38 @@ export function ProfilePage() {
           {user?.phone ? ` · ${user.phone}` : ' · 未绑手机号'}
           {user?.hasOpenid ? ' · 已绑微信' : ' · 未绑微信'}
         </p>
+        <Link className="account-link" to="/shop#packs">
+          <span>礼包</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <Link className="account-link" to="/bag">
+          <span>背包</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <Link className="account-link" to="/records">
+          <span>记录</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <Link className="account-link" to="/mail">
+          <span>
+            邮件
+            {wallet?.unread > 0 ? <em>{wallet.unread}</em> : null}
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <Link className="account-link" to="/activity">
+          <span>
+            活动
+            {wallet?.activity > 0 ? <em>{wallet.activity}</em> : null}
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        {user?.role === 'admin' ? (
+          <Link className="account-link" to="/admin">
+            <span>后台</span>
+            <span aria-hidden="true">›</span>
+          </Link>
+        ) : null}
         <Link className="account-link" to="/profile/bind">
           <span>账号绑定</span>
           <span aria-hidden="true">›</span>

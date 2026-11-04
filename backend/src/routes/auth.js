@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { refreshCookieOptions } from '../lib/jwt.js'
-import { loginSchema, passwordChangeSchema, phoneAuthSchema, phoneLoginSchema, registerSchema, wechatAuthSchema } from '../lib/schemas.js'
+import { loginSchema, passwordChangeSchema, phoneAuthSchema, phoneCodeSchema, phoneLoginSchema, phoneSendSchema, registerSchema, wechatAuthSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { authRequired } from '../middleware/auth.js'
 import {
@@ -11,6 +11,8 @@ import {
   issueAuth,
   loginGuest,
   loginPhone,
+  loginPhoneCode,
+  sendPhoneCode,
   loginUser,
   loginWechat,
   logoutRefreshToken,
@@ -55,6 +57,23 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const body = parseWith(phoneLoginSchema, req.body)
     const user = await loginPhone(body)
+    ok(res, await issueAuth(res, user))
+  }),
+)
+
+authRouter.post(
+  '/sms/send',
+  asyncHandler(async (req, res) => {
+    const body = parseWith(phoneSendSchema, req.body)
+    ok(res, await sendPhoneCode(body.phone))
+  }),
+)
+
+authRouter.post(
+  '/login/phone-code',
+  asyncHandler(async (req, res) => {
+    const body = parseWith(phoneCodeSchema, req.body)
+    const user = await loginPhoneCode(body)
     ok(res, await issueAuth(res, user))
   }),
 )

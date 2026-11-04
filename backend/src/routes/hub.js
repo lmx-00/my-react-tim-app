@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { authRequired } from '../middleware/auth.js'
-import { buyOffer, checkIn, claimAllMail, claimEvent, claimMail, createRecharge, getActivity, getBag, getShop, listMail, loadWallet, startCheckout } from '../services/walletService.js'
+import { buyOffer, checkIn, claimAllMail, claimEvent, claimMail, claimTask, createRecharge, getActivity, getBag, getShop, listMail, loadWallet, startCheckout } from '../services/walletService.js'
 
 export const hubRouter = Router()
 
@@ -52,6 +52,10 @@ hubRouter.get('/activity', asyncHandler(async (req, res) => {
 
 hubRouter.post('/activity/check-in', asyncHandler(async (req, res) => {
   ok(res, await checkIn(req.user.id))
+}))
+
+hubRouter.post('/activity/tasks/:id/claim', asyncHandler(async (req, res) => {
+  ok(res, await claimTask(req.user.id, req.params.id))
 }))
 
 hubRouter.post('/activity/:id/claim', asyncHandler(async (req, res) => {

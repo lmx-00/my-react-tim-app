@@ -126,6 +126,16 @@ model Order {
   @@index([userId, status])
 }
 
+model SmsCode {
+  id        String   @id @default(uuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+}
+
 model Setting {
   key   String @id
   value Json

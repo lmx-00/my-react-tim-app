@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { claimEvent, getActivity, checkIn, notifyWallet } from '../api/game.js'
+import { claimEvent, claimTask, getActivity, checkIn, notifyWallet } from '../api/game.js'
 
 function endsLabel(value) {
   const date = new Date(value)
@@ -40,14 +40,25 @@ export function ActivityPage() {
     }
   }
 
-  async function claim() {
-    if (!activity?.event) return
+  async function claim(id) {
     setError('')
     setNote('')
     try {
-      setActivity(await claimEvent(activity.event.id))
+      setActivity(await claimEvent(id))
       notifyWallet()
       setNote('活动奖励已领到')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function finishTask(id) {
+    setError('')
+    setNote('')
+    try {
+      setActivity(await claimTask(id))
+      notifyWallet()
+      setNote('任务奖励已领到')
     } catch (err) {
       setError(err.message)
     }
@@ -81,20 +92,29 @@ export function ActivityPage() {
             </div>
             <strong className="bag-count">{activity.streak}/{activity.streakGoal}</strong>
           </article>
-          {activity.event ? (
-            <article className="shop-row">
+          {(activity.events ?? []).map((event) => (
+            <article key={event.id} className="shop-row">
               <div>
-                <strong>{activity.event.name}</strong>
-                <p className="muted">{activity.event.text}</p>
-                <p className="muted">{endsLabel(activity.event.endsAt)}</p>
+                <strong>{event.name}</strong>
+                <p className="muted">{event.text}</p>
+                <p className="muted">{endsLabel(event.endsAt)}</p>
               </div>
-              <button type="button" className="btn btn-sm" disabled={activity.event.claimed} onClick={claim}>
-                {activity.event.claimed ? '已领取' : '领取'}
+              <button type="button" className="btn btn-sm" disabled={event.claimed} onClick={() => claim(event.id)}>
+                {event.claimed ? '已领取' : '领取'}
               </button>
             </article>
-          ) : (
-            <p className="muted">当前没有限时活动。</p>
-          )}
+          ))}
+          {(activity.tasks ?? []).map((task) => (
+            <article key={task.id} className="shop-row">
+              <div>
+                <strong>{task.name}</strong>
+                <p className="muted">{task.text}</p>
+              </div>
+              <button type="button" className="btn btn-sm" disabled={!task.done || task.claimed} onClick={() => finishTask(task.id)}>
+                {task.claimed ? '已领取' : task.done ? '领取' : '未完成'}
+              </button>
+            </article>
+          ))}
         </>
       ) : null}
     </section>

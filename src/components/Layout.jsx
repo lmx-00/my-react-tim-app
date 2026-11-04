@@ -1,18 +1,38 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { getTheme } from '../api/game.js'
+import { addFriend, getTheme, getWallet } from '../api/game.js'
 import { applyTheme } from '../game/theme.js'
 import { setSiteSound } from '../game/sound.js'
 import { rememberWechat } from '../auth/wechat.js'
 import { useAuth } from '../auth/useAuth.js'
 import { Landscape } from './Landscape.jsx'
 import { WalletStrip } from './WalletStrip.jsx'
-import { Dock } from './Dock.jsx'
 
 export function Layout({ children }) {
   const { isLoggedIn, user, saveAvatar } = useAuth()
   const location = useLocation()
   const inGame = location.pathname.startsWith('/play/')
+  // 读条那一下也把顶部收起来，既是整屏的加载画面，也免得读到一半被点进别的页面
+  const inLoad = location.pathname.startsWith('/load/')
+  const [notices, setNotices] = useState(0)
+
+  useEffect(() => {
+    if (!isLoggedIn) return undefined
+    let cancelled = false
+    const load = () => {
+      getWallet()
+        .then((data) => {
+          if (!cancelled) setNotices(data.notices ?? 0)
+        })
+        .catch(() => {})
+    }
+    load()
+    window.addEventListener('hm-wallet', load)
+    return () => {
+      cancelled = true
+      window.removeEventListener('hm-wallet', load)
+    }
+  }, [isLoggedIn, location.pathname])
 
   useEffect(() => {
     getTheme()
@@ -24,6 +44,18 @@ export function Layout({ children }) {
         applyTheme('candy')
       })
   }, [])
+
+  useEffect(() => {
+    const invite = new URLSearchParams(location.search).get('invite')
+    if (invite) sessionStorage.setItem('hm-invite', invite)
+    if (!isLoggedIn) return undefined
+    const pending = sessionStorage.getItem('hm-invite')
+    if (!pending) return undefined
+    addFriend(pending)
+      .catch(() => {})
+      .finally(() => sessionStorage.removeItem('hm-invite'))
+    return undefined
+  }, [isLoggedIn, location.search])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -38,9 +70,9 @@ export function Layout({ children }) {
   }, [isLoggedIn, location.search, saveAvatar, user?.avatarUrl])
 
   return (
-    <div className={`app-shell${isLoggedIn && !inGame ? ' has-dock' : ''}`}>
+    <div className={`app-shell${inGame ? ' is-playing' : ''}`}>
       <Landscape />
-      {inGame ? null : (
+      {inGame || inLoad ? null : (
       <div className="sticky-top">
       <header className="topbar">
         <Link to={isLoggedIn ? '/' : '/login'} className="brand">
@@ -49,11 +81,13 @@ export function Layout({ children }) {
         <nav className="nav">
           <NavLink to="/levels">关卡</NavLink>
           <NavLink to="/shop">商店</NavLink>
-          <NavLink to="/bag">背包</NavLink>
           <NavLink to="/rank">排行</NavLink>
-          <NavLink to="/records">记录</NavLink>
-          <NavLink to="/profile">我的</NavLink>
-          {user?.role === 'admin' ? <NavLink to="/admin">后台</NavLink> : null}
+          <NavLink to="/profile">
+            <span className="nav-label">
+              我的
+              {notices > 0 ? <em>{notices > 9 ? '9+' : notices}</em> : null}
+            </span>
+          </NavLink>
         </nav>
         <div className="topbar-actions">
           {isLoggedIn ? (
@@ -76,7 +110,6 @@ export function Layout({ children }) {
       )}
       {inGame && isLoggedIn ? <WalletStrip /> : null}
       <main className={`page${inGame ? ' is-game' : ''}`}>{children}</main>
-      {isLoggedIn && !inGame ? <Dock /> : null}
     </div>
   )
 }

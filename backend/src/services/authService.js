@@ -285,6 +285,46 @@ export async function loginPhone({ phone, password }) {
   return prisma.user.findUnique({ where: { id: user.id } })
 }
 
+export async function sendPhoneCode(phone) {
+  const recent = await prisma.smsCode.findFirst({
+    where: { phone, createdAt: { gt: new Date(Date.now() - 60 * 1000) } },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (recent) throw new AppError(429, 'SMS_COOLDOWN', '验证码刚发过，请 1 分钟后再试')
+  const code = String(Math.floor(100000 + Math.random() * 900000))
+  await prisma.smsCode.create({
+    data: {
+      phone,
+      codeHash: crypto.createHash('sha256').update(code).digest('hex'),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    },
+  })
+  if (process.env.SMS_WEBHOOK_URL) {
+    await fetch(process.env.SMS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, code }),
+    })
+    return { sent: true }
+  }
+  return { sent: false, devCode: code }
+}
+
+export async function loginPhoneCode({ phone, code }) {
+  const row = await prisma.smsCode.findFirst({ where: { phone }, orderBy: { createdAt: 'desc' } })
+  const hash = crypto.createHash('sha256').update(String(code)).digest('hex')
+  if (!row || row.expiresAt < new Date() || row.codeHash !== hash) {
+    throw new AppError(401, 'INVALID_CODE', '验证码不正确或已过期')
+  }
+  await prisma.smsCode.deleteMany({ where: { phone } })
+  const existing = await prisma.user.findUnique({ where: { phone } })
+  if (existing) {
+    await clearLoginLock(existing.id)
+    return prisma.user.findUnique({ where: { id: existing.id } })
+  }
+  return createPlayer({ username: `p${phone}`, phone, isGuest: false })
+}
+
 export async function loginGuest() {
   return createNamedPlayer('g', { isGuest: true })
 }

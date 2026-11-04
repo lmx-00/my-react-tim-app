@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { loginRequest, logoutRequest, registerRequest, registerPhoneRequest, loginPhoneRequest, guestLoginRequest, wechatLoginRequest, bindPhoneRequest, bindWechatRequest, saveAvatarRequest } from '../api/auth.js'
+import { loginRequest, logoutRequest, registerRequest, registerPhoneRequest, loginPhoneRequest, sendPhoneCodeRequest, loginPhoneCodeRequest, guestLoginRequest, wechatLoginRequest, bindPhoneRequest, bindWechatRequest, saveAvatarRequest } from '../api/auth.js'
 import { onAuthChange, refreshAuth, setAuthToken } from '../api/client.js'
 import { AuthContext } from './useAuth.js'
 
@@ -73,6 +73,14 @@ export function AuthProvider({ children }) {
       },
       async loginPhone(phone, password) {
         const data = await loginPhoneRequest(phone, password)
+        applyAuth(data)
+        return data
+      },
+      async sendPhoneCode(phone) {
+        return sendPhoneCodeRequest(phone)
+      },
+      async loginPhoneCode(phone, code) {
+        const data = await loginPhoneCodeRequest(phone, code)
         applyAuth(data)
         return data
       },

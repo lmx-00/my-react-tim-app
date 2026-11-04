@@ -132,6 +132,17 @@ export function buildFrames(startCells, events) {
         break
       }
 
+      case 'crate': {
+        flush()
+        for (const [y, x] of event.cells) {
+          const tile = cells[y]?.[x]
+          if (!tile) continue
+          if ((tile.layers ?? 1) > 1) cells[y][x] = { ...tile, layers: tile.layers - 1 }
+          else cells[y][x] = null
+        }
+        frames.push({ kind: 'settle', cells: cloneCells(cells), falling: {}, spawning: [] })
+        break
+      }
       case 'ice':
       case 'snow': {
         flush()

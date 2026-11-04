@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createSession, playMove, quitSession, undoMove, useHammer, useShuffle, useSwap } from '../api/game.js'
+import { createSession, playMove, quitSession, undoMove, useHammer, usePlus, useShuffle, useSwap } from '../api/game.js'
 import { Board } from '../components/Board.jsx'
 import { ResultDialog } from '../components/ResultDialog.jsx'
 import { buildFrames } from '../game/replay.js'
@@ -238,6 +238,20 @@ export function PlayPage() {
     }
   }
 
+  async function handlePlus() {
+    if (!session || busy) return
+    setBusy(true)
+    setTool(null)
+    try {
+      const result = await usePlus(session.sessionId)
+      setSession((current) => ({ ...current, ...result }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleShuffle() {
     if (!session || busy) return
     setBusy(true)
@@ -291,19 +305,21 @@ export function PlayPage() {
   return (
     <section className="stack play-stack">
       <div className="hud">
-        <div>
+        <div className="hud-main">
           <h1>
             第 {session.level.id} 关 {session.level.name}
           </h1>
           <p>目标：{goalText(session.level)}</p>
-          <p>{goalProgressText(session.level, session.score, session.goalProgress)}</p>
+          <p className="hud-progress">{goalProgressText(session.level, session.score, session.goalProgress)}</p>
         </div>
         <div className="hud-stats">
           <span>
-            分数 <strong>{session.score}</strong>
+            <small>分数</small>
+            <strong>{session.score}</strong>
           </span>
           <span className={lowMoves ? 'is-danger' : ''}>
-            步数 <strong>{session.movesLeft}</strong>
+            <small>步数</small>
+            <strong>{session.movesLeft}</strong>
           </span>
         </div>
       </div>
@@ -351,6 +367,14 @@ export function PlayPage() {
           disabled={busy || paused || ended || !session.tools?.swap}
         >
           交换 {session.tools?.swap ?? 0}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={handlePlus}
+          disabled={busy || ended || !session.tools?.plus}
+        >
+          加五步 {session.tools?.plus ?? 0}
         </button>
       </div>
       {tool === 'hammer' ? <p className="muted">结冰的小动物拖不动。锤子敲一下只碎一层冰，小动物还在。不扣步数。</p> : null}

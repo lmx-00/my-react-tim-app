@@ -23,8 +23,12 @@ function frozen(tile) {
   return Boolean(tile && (tile.ice > 0 || tile.snow))
 }
 
+function blocked(tile) {
+  return frozen(tile) || tile?.type === 'crate'
+}
+
 function playColor(cell) {
-  if (frozen(cell)) return null
+  if (frozen(cell) || cell?.type === 'crate') return null
   return matchColor(cell)
 }
 
@@ -104,7 +108,7 @@ export function findLegalMoves(board) {
     for (let col = 0; col < board.cols; col += 1) {
       for (const [nrow, ncol] of neighbors(row, col)) {
         if (!inBounds(board, nrow, ncol)) continue
-        if (frozen(board.cells[row][col]) || frozen(board.cells[nrow][ncol])) continue
+        if (blocked(board.cells[row][col]) || blocked(board.cells[nrow][ncol])) continue
         if (wouldMatch(board, row, col, nrow, ncol)) {
           moves.push({ y1: row, x1: col, y2: nrow, x2: ncol })
         }
@@ -190,6 +194,7 @@ function decideSpecials(board, groups, swapCells) {
 function collectBlast(board, startCells, rainbowColor) {
   const toClear = new Set()
   const iceHits = new Set()
+  const crateHits = new Set()
   const extraScores = { rocket: 0, bomb: 0, rainbow: 0 }
   const queue = startCells.map(([row, col]) => ({ row, col, reason: 'match' }))
   const activated = new Set()
@@ -217,6 +222,10 @@ function collectBlast(board, startCells, rainbowColor) {
       iceHits.add(key)
       continue
     }
+    if (tile?.type === 'crate') {
+      crateHits.add(key)
+      continue
+    }
     if (toClear.has(key)) continue
     toClear.add(key)
     if (!tile || activated.has(key)) continue
@@ -241,7 +250,7 @@ function collectBlast(board, startCells, rainbowColor) {
     }
   }
 
-  return { toClear, extraScores, iceHits }
+  return { toClear, extraScores, iceHits, crateHits }
 }
 
 function scoreGroups(groups) {
@@ -301,7 +310,7 @@ function applyGravity(board) {
     let write = board.rows - 1
     for (let row = board.rows - 1; row >= 0; row -= 1) {
       const tile = board.cells[row][col]
-      if (frozen(tile)) {
+      if (blocked(tile)) {
         write = row - 1
         continue
       }
@@ -347,11 +356,40 @@ function crackIce(board, toClear, iceHits) {
   return cells
 }
 
-function settleClears(board, rng, colorCount, toClear, spawns, iceHits) {
+function crackCrates(board, toClear, crateHits) {
+  const hits = new Set(crateHits)
+  for (const key of toClear) {
+    const [row, col] = parseKey(key)
+    for (const [nr, nc] of [
+      [row - 1, col],
+      [row + 1, col],
+      [row, col - 1],
+      [row, col + 1],
+    ]) {
+      if (!inBounds(board, nr, nc)) continue
+      if (board.cells[nr][nc]?.type === 'crate') hits.add(cellKey(nr, nc))
+    }
+  }
+  const cells = []
+  for (const key of hits) {
+    const [row, col] = parseKey(key)
+    const tile = board.cells[row][col]
+    if (tile?.type !== 'crate') continue
+    const layers = (tile.layers ?? 1) - 1
+    if (layers > 0) board.cells[row][col] = { ...tile, layers }
+    else board.cells[row][col] = null
+    cells.push([row, col])
+  }
+  return cells
+}
+
+function settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits = new Set()) {
   const events = []
   applyClears(board, toClear, spawns)
   const cracked = crackIce(board, toClear, iceHits)
   if (cracked.length) events.push({ type: 'ice', cells: cracked })
+  const crates = crackCrates(board, toClear, crateHits)
+  if (crates.length) events.push({ type: 'crate', cells: crates })
   const drops = applyGravity(board)
   if (drops.length) events.push({ type: 'drop', moves: drops })
   const fills = fillBoard(board, rng, colorCount)
@@ -386,7 +424,7 @@ function resolveWaves(board, rng, colorCount, swapCells) {
 
     const matchedCells = groups.flatMap((g) => g.cells)
     const spawns = decideSpecials(board, groups, first ? swapCells : null)
-    const { toClear, extraScores, iceHits } = collectBlast(board, matchedCells, null)
+    const { toClear, extraScores, iceHits, crateHits } = collectBlast(board, matchedCells, null)
     const waveScore = Math.round(
       (scoreGroups(groups) + extraScores.rocket + extraScores.bomb + extraScores.rainbow)
         * comboMultiplier(wave),
@@ -411,7 +449,7 @@ function resolveWaves(board, rng, colorCount, swapCells) {
       })
     }
 
-    events.push(...settleClears(board, rng, colorCount, toClear, spawns, iceHits))
+    events.push(...settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits))
 
     first = false
     wave += 1
@@ -428,13 +466,54 @@ function waveEffect(extraScores) {
   return 'match'
 }
 
-function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
-  const start = []
-  for (const [y, x] of [[y1, x1], [y2, x2]]) {
-    const tile = board.cells[y][x]
-    if (tile?.type === 'rocket' || tile?.type === 'bomb') start.push([y, x])
+function lineCells(board, y, x, dir) {
+  const cells = []
+  if (dir === 'row') {
+    for (let col = 0; col < board.cols; col += 1) cells.push([y, col])
+  } else {
+    for (let row = 0; row < board.rows; row += 1) cells.push([row, x])
   }
-  const { toClear, extraScores, iceHits } = collectBlast(board, start, null)
+  return cells.filter(([row, col]) => inBounds(board, row, col))
+}
+
+function thickCross(board, y, x, span) {
+  const cells = []
+  const half = Math.floor(span / 2)
+  for (let offset = -half; offset <= half; offset += 1) {
+    cells.push(...lineCells(board, y + offset, x, 'row'))
+    cells.push(...lineCells(board, y, x + offset, 'col'))
+  }
+  return cells
+}
+
+function disk(board, y, x, radius) {
+  const cells = []
+  for (let dr = -radius; dr <= radius; dr += 1) {
+    for (let dc = -radius; dc <= radius; dc += 1) {
+      if (inBounds(board, y + dr, x + dc)) cells.push([y + dr, x + dc])
+    }
+  }
+  return cells
+}
+
+function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
+  const a = board.cells[y1][x1]
+  const b = board.cells[y2][x2]
+  let start = []
+  if (a?.type === 'rocket' && b?.type === 'rocket') {
+    start = [...thickCross(board, y1, x1, 1), ...thickCross(board, y2, x2, 1)]
+  } else if ((a?.type === 'rocket' && b?.type === 'bomb') || (a?.type === 'bomb' && b?.type === 'rocket')) {
+    const at = a?.type === 'bomb' ? [y1, x1] : [y2, x2]
+    start = thickCross(board, at[0], at[1], 3)
+  } else if (a?.type === 'bomb' && b?.type === 'bomb') {
+    start = [...disk(board, y1, x1, 2), ...disk(board, y2, x2, 2)]
+  } else {
+    for (const [y, x] of [[y1, x1], [y2, x2]]) {
+      const tile = board.cells[y][x]
+      if (tile?.type === 'rocket' || tile?.type === 'bomb') start.push([y, x])
+    }
+  }
+  const { toClear, extraScores, iceHits, crateHits } = collectBlast(board, start, null)
   const collected = {}
   tallyCleared(board, toClear, collected)
   const waveScore = Math.round(
@@ -448,7 +527,7 @@ function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
       score: waveScore,
       effect: waveEffect(extraScores),
     },
-    ...settleClears(board, rng, colorCount, toClear, {}, iceHits),
+    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits),
   ]
 
   const rest = resolveWaves(board, rng, colorCount, null)
@@ -464,19 +543,34 @@ function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
 function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
   const a = board.cells[y1][x1]
   const other = a.type === 'rainbow' ? board.cells[y2][x2] : a
-  const color = matchColor(other)
+  const color = other?.type === 'rocket' || other?.type === 'bomb' ? other.color : matchColor(other)
   const start = [
     [y1, x1],
     [y2, x2],
   ]
-  if (!color) {
+  if (other?.type === 'rocket' || other?.type === 'bomb') {
+    let index = 0
+    for (let row = 0; row < board.rows; row += 1) {
+      for (let col = 0; col < board.cols; col += 1) {
+        const tile = board.cells[row][col]
+        if (frozen(tile) || matchColor(tile) !== color) continue
+        if (other.type === 'rocket') start.push(...lineCells(board, row, col, index % 2 ? 'row' : 'col'))
+        else start.push(...disk(board, row, col, 1))
+        index += 1
+      }
+    }
+  } else if (!color) {
     for (let row = 0; row < board.rows; row += 1) {
       for (let col = 0; col < board.cols; col += 1) {
         if (board.cells[row][col]) start.push([row, col])
       }
     }
   }
-  const { toClear, extraScores, iceHits } = collectBlast(board, start, color)
+  const { toClear, extraScores, iceHits, crateHits } = collectBlast(
+    board,
+    start,
+    other?.type === 'rocket' || other?.type === 'bomb' ? null : color,
+  )
 
   const collected = {}
   tallyCleared(board, toClear, collected)
@@ -494,7 +588,7 @@ function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
       wave: 1,
       score: waveScore,
     },
-    ...settleClears(board, rng, colorCount, toClear, {}, iceHits),
+    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits),
   ]
 
   const rest = resolveWaves(board, rng, colorCount, null)
@@ -519,7 +613,7 @@ export function shuffleBoard(board, rng, colorCount) {
     const spots = []
     for (let row = 0; row < board.rows; row += 1) {
       for (let col = 0; col < board.cols; col += 1) {
-        if (frozen(board.cells[row][col])) continue
+        if (blocked(board.cells[row][col])) continue
         tiles.push(board.cells[row][col])
         spots.push([row, col])
       }
@@ -595,10 +689,31 @@ function plantRainbowBombs(board, rng, count) {
 function finishBoard(board, rng, levelConfig) {
   plantRainbowBombs(board, rng, rainbowCountForLevel(levelConfig))
   plantSnow(board, rng)
+  if ((levelConfig?.id ?? 0) >= 11) plantCrates(board, rng)
   if (hasMatch(board) || findLegalMoves(board).length === 0) {
     shuffleBoard(board, rng, levelConfig.colorCount)
   }
   return board
+}
+
+function plantCrates(board, rng) {
+  const spots = []
+  for (let row = 0; row < board.rows; row += 1) {
+    for (let col = 0; col < board.cols; col += 1) {
+      const tile = board.cells[row][col]
+      if (!tile || tile.ice || tile.type === 'rainbow' || tile.type === 'rocket' || tile.type === 'bomb') continue
+      spots.push([row, col])
+    }
+  }
+  const count = Math.max(4, Math.round(spots.length / 8))
+  for (let i = spots.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[spots[i], spots[j]] = [spots[j], spots[i]]
+  }
+  for (let i = 0; i < count && i < spots.length; i += 1) {
+    const [row, col] = spots[i]
+    board.cells[row][col] = { type: 'crate', layers: rng() < 0.3 ? 2 : 1 }
+  }
 }
 
 function plantSnow(board, rng) {
@@ -651,7 +766,7 @@ export function applySwap(board, move, levelConfig, rng) {
   if (!inBounds(board, y1, x1) || !inBounds(board, y2, x2) || !adjacent(y1, x1, y2, x2)) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
-  if (frozen(board.cells[y1]?.[x1]) || frozen(board.cells[y2]?.[x2])) {
+  if (blocked(board.cells[y1]?.[x1]) || blocked(board.cells[y2]?.[x2])) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
 
@@ -711,7 +826,7 @@ export function applySwapTool(board, move, levelConfig, rng) {
   if (!board.cells[y1]?.[x1] || !board.cells[y2]?.[x2]) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
-  if (frozen(board.cells[y1][x1]) || frozen(board.cells[y2][x2])) {
+  if (blocked(board.cells[y1][x1]) || blocked(board.cells[y2][x2])) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
 
@@ -783,6 +898,35 @@ export function applyHammer(board, point, levelConfig, rng) {
     return { valid: false, events: [], board, scoreDelta: 0, collected: {} }
   }
 
+  if (tile.type === 'crate') {
+    const next = cloneBoard(board)
+    const layers = (tile.layers ?? 1) - 1
+    if (layers > 0) {
+      next.cells[y][x] = { ...tile, layers }
+      return {
+        valid: true,
+        events: [{ type: 'crate', cells: [[y, x]] }],
+        board: next,
+        scoreDelta: 0,
+        collected: {},
+      }
+    }
+    next.cells[y][x] = null
+    const events = [{ type: 'crate', cells: [[y, x]] }]
+    const drops = applyGravity(next)
+    if (drops.length) events.push({ type: 'drop', moves: drops })
+    const fills = fillBoard(next, rng, levelConfig.colorCount)
+    if (fills.length) events.push({ type: 'fill', cells: fills })
+    const rest = resolveWaves(next, rng, levelConfig.colorCount, null)
+    return {
+      valid: true,
+      events: [...events, ...rest.events],
+      board: next,
+      scoreDelta: rest.scoreDelta,
+      collected: rest.collected,
+    }
+  }
+
   if (frozen(tile)) {
     const next = cloneBoard(board)
     const cracked = crackIce(next, new Set(), new Set([cellKey(y, x)]))
@@ -796,7 +940,7 @@ export function applyHammer(board, point, levelConfig, rng) {
   }
 
   const next = cloneBoard(board)
-  const { toClear, extraScores, iceHits } = collectBlast(next, [[y, x]], null)
+  const { toClear, extraScores, iceHits, crateHits } = collectBlast(next, [[y, x]], null)
   const collected = {}
   tallyCleared(next, toClear, collected)
   const waveScore = Math.round(extraScores.rocket + extraScores.bomb + extraScores.rainbow + toClear.size * 10)
@@ -808,7 +952,7 @@ export function applyHammer(board, point, levelConfig, rng) {
       score: waveScore,
       effect: waveEffect(extraScores),
     },
-    ...settleClears(next, rng, levelConfig.colorCount, toClear, {}, iceHits),
+    ...settleClears(next, rng, levelConfig.colorCount, toClear, {}, iceHits, crateHits),
   ]
 
   const rest = resolveWaves(next, rng, levelConfig.colorCount, null)

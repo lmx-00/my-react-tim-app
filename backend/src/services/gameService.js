@@ -177,6 +177,7 @@ function normalizeTools(tools) {
     hammer: count(tools?.hammer, 3),
     shuffle: count(tools?.shuffle, 1),
     swap: count(tools?.swap, 1),
+    plus: count(tools?.plus, 0),
   }
 }
 
@@ -288,7 +289,7 @@ export async function createSession(userId, levelId) {
       rngState: rng.getState(),
       movesLeft: level.moveLimit,
       goalProgress: emptyGoalProgress(level),
-      tools: { hammer: settings.hammer, shuffle: settings.shuffle, swap: settings.swap },
+      tools: { hammer: settings.hammer, shuffle: settings.shuffle, swap: settings.swap, plus: 0 },
     },
   })
 
@@ -479,6 +480,23 @@ export async function useSwapTool(userId, sessionId, move) {
   const spent = await spendTool(session, 'swap')
   result.rngState = rng.getState()
   return settleTool(userId, session, level, result, spent.tools, spent.fromBag ? 'swap' : null)
+}
+
+export async function usePlus(userId, sessionId) {
+  const session = await loadOwnedSession(userId, sessionId)
+  if (session.status !== 'playing') throw new AppError(409, 'SESSION_ENDED', '对局已经结束')
+  const spent = await spendTool(session, 'plus')
+  const level = await prisma.level.findUnique({ where: { id: session.levelId } })
+  const updated = await prisma.gameSession.update({
+    where: { id: session.id },
+    data: {
+      movesLeft: session.movesLeft + 5,
+      tools: persistTools(spent.tools, [...bagLog(session), spent.fromBag ? 'plus' : null]),
+      history: pushHistory(session),
+      lastMoveAt: new Date(),
+    },
+  })
+  return present(updated, level)
 }
 
 // 星星总数存在 progress.levelStars 这个 JSON 里，数据库排不了序，

@@ -4,7 +4,9 @@ import { useAuth } from '../auth/useAuth.js'
 import { rememberWechat, storedWechat } from '../auth/wechat.js'
 
 export function LoginPage() {
-  const { login, loginPhone, loginGuest, loginWechat } = useAuth()
+  const { login, loginPhone, sendPhoneCode, loginPhoneCode, loginGuest, loginWechat } = useAuth()
+  const [code, setCode] = useState('')
+  const [devCode, setDevCode] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
   const [mode, setMode] = useState('username')
@@ -22,7 +24,13 @@ export function LoginPage() {
     setError('')
     setSubmitting(true)
     try {
-      if (mode === 'phone') {
+      if (mode === 'code') {
+        if (!/^1\d{10}$/.test(phone) || !/^\d{6}$/.test(code)) {
+          setError('请输入手机号和 6 位验证码')
+          return
+        }
+        await loginPhoneCode(phone, code)
+      } else if (mode === 'phone') {
         if (!/^1\d{10}$/.test(phone)) {
           setError('请输入 11 位手机号')
           return
@@ -85,10 +93,13 @@ export function LoginPage() {
         <button type="button" className={mode === 'phone' ? 'is-on' : ''} onClick={() => setMode('phone')}>
           手机号
         </button>
+        <button type="button" className={mode === 'code' ? 'is-on' : ''} onClick={() => setMode('code')}>
+          验证码
+        </button>
       </div>
       <form className="form" onSubmit={handleSubmit}>
         {error ? <p className="form-error">{error}</p> : null}
-        {mode === 'phone' ? (
+        {mode === 'phone' || mode === 'code' ? (
           <label>
             手机号
             <input
@@ -110,16 +121,48 @@ export function LoginPage() {
             />
           </label>
         )}
-        <label>
-          密码
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
+        {mode === 'code' ? (
+          <label>
+            验证码
+            <input
+              name="code"
+              inputMode="numeric"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </label>
+        ) : (
+          <label>
+            密码
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+        )}
+        {mode === 'code' ? (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={submitting}
+            onClick={async () => {
+              setError('')
+              setDevCode('')
+              try {
+                const data = await sendPhoneCode(phone)
+                if (data.devCode) setDevCode(data.devCode)
+              } catch (err) {
+                setError(err.message)
+              }
+            }}
+          >
+            获取验证码
+          </button>
+        ) : null}
+        {devCode ? <p className="muted">短信服务还没配置，本次验证码是 {devCode}</p> : null}
         <button type="submit" className="btn" disabled={submitting}>
           {submitting ? '登录中…' : '登录'}
         </button>

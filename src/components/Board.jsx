@@ -53,6 +53,7 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
           const fall = falling[key]
           const classes = ['tile', `tile-${tile?.type ?? 'empty'}`]
 
+          if (tile?.type === 'crate') classes.push((tile.layers ?? 1) > 1 ? 'is-crate is-crate-2' : 'is-crate')
           const ice = tile?.ice || (tile?.snow ? 1 : 0)
           if (ice) classes.push(ice > 1 ? 'is-ice is-ice-2' : 'is-ice')
           if (tile?.type === 'rocket' && tile.dir) classes.push(`is-${tile.dir}`)
@@ -74,7 +75,7 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
             >
               {tile?.type === 'rocket' ? (
                 <RocketFace dir={tile.dir} />
-              ) : tile?.type ? (
+              ) : tile?.type && tile.type !== 'crate' ? (
                 <MonsterTile type={tile.type} />
               ) : null}
             </button>

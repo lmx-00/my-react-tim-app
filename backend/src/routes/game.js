@@ -12,6 +12,7 @@ import {
   useHammer,
   useShuffle,
   useSwapTool,
+  usePlus,
 } from '../services/gameService.js'
 
 export const gameRouter = Router()
@@ -72,6 +73,14 @@ gameRouter.post(
   authRequired,
   asyncHandler(async (req, res) => {
     ok(res, await useShuffle(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/plus',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await usePlus(req.user.id, req.params.id))
   }),
 )
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { addFriend, getLeaderboard, removeFriend } from '../api/game.js'
+import { useAuth } from '../auth/useAuth.js'
 
 const PAGE_SIZE = 50
 
@@ -33,9 +34,10 @@ function RankRow({ item, scoreMode, onRemove }) {
 }
 
 export function RankPage() {
+  const { user } = useAuth()
   const [tab, setTab] = useState('all')
   const [levelId, setLevelId] = useState(1)
-  const [levelDraft, setLevelDraft] = useState('1')
+  const [levelDraft, setLevelDraft] = useState('')
   const [friendName, setFriendName] = useState('')
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
@@ -81,7 +83,17 @@ export function RankPage() {
 
   function lookUpLevel(event) {
     event.preventDefault()
-    const next = Number(levelDraft)
+    const text = levelDraft.trim()
+    if (!text) {
+      setLevelId(1)
+      setPage(1)
+      setItems([])
+      setLoading(true)
+      setError('')
+      setReload((value) => value + 1)
+      return
+    }
+    const next = Number(text)
     if (!Number.isInteger(next) || next < 1 || next > 1000) {
       setError('关卡号要在 1 到 1000 之间')
       return
@@ -153,6 +165,30 @@ export function RankPage() {
           />
           <button type="submit" className="btn btn-sm">
             加好友
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={async () => {
+              const link = `${window.location.origin}/?invite=${user?.username ?? ''}`
+              const text = `来开心消消乐加我好友：${link}`
+              if (navigator.share) {
+                try {
+                  await navigator.share({ title: '开心消消乐', text, url: link })
+                  return
+                } catch (err) {
+                  if (err?.name === 'AbortError') return
+                }
+              }
+              try {
+                await navigator.clipboard.writeText(text)
+                setError('邀请链接已复制，发给微信好友打开就能加上')
+              } catch {
+                setError(text)
+              }
+            }}
+          >
+            邀请微信好友
           </button>
         </form>
       ) : null}

@@ -37,6 +37,14 @@ export function loginPhoneRequest(phone, password) {
   return api('/auth/login/phone', { method: 'POST', body: { phone, password } })
 }
 
+export function sendPhoneCodeRequest(phone) {
+  return api('/auth/sms/send', { method: 'POST', body: { phone } })
+}
+
+export function loginPhoneCodeRequest(phone, code) {
+  return api('/auth/login/phone-code', { method: 'POST', body: { phone, code } })
+}
+
 export function guestLoginRequest() {
   return api('/auth/guest', { method: 'POST' })
 }

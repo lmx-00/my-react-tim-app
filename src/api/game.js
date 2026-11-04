@@ -59,6 +59,10 @@ export function useSwap(sessionId, move) {
   return api(`/game/sessions/${sessionId}/swap`, { method: 'POST', body: move })
 }
 
+export function usePlus(sessionId) {
+  return api(`/game/sessions/${sessionId}/plus`, { method: 'POST' })
+}
+
 export function getLeaderboard({ page = 1, pageSize = 50, scope = 'all', levelId } = {}) {
   const params = { page, pageSize, scope }
   if (levelId) params.levelId = String(levelId)
@@ -134,6 +138,10 @@ export function getActivity() {
 
 export function claimEvent(id) {
   return api(`/activity/${id}/claim`, { method: 'POST' })
+}
+
+export function claimTask(id) {
+  return api(`/activity/tasks/${id}/claim`, { method: 'POST' })
 }
 
 export function createRecharge(productId) {
