@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { NO_STAMINA_TEXT, staminaBlocked } from '../api/game.js'
+import { NO_STAMINA_TEXT, createPost, staminaBlocked } from '../api/game.js'
 import { Stars } from './Stars.jsx'
 
 const STATUS_TEXT = {
@@ -23,6 +23,8 @@ export function ResultDialog({ session }) {
   const navigate = useNavigate()
   const [shareNote, setShareNote] = useState('')
   const [blocked, setBlocked] = useState('')
+  const [posted, setPosted] = useState(false)
+  const [posting, setPosting] = useState(false)
   const won = session.status === 'won'
   const nextId = session.nextLevelId
   const tools = toolText(session.rewardTools)
@@ -41,10 +43,27 @@ export function ResultDialog({ session }) {
     navigate(`/load/${levelId}`)
   }
 
+  async function postToCommunity() {
+    if (posted || posting) return
+    setPosting(true)
+    setShareNote('')
+    try {
+      await createPost({ sessionId: session.sessionId })
+      setPosted(true)
+      setShareNote('已发到社区')
+    } catch (err) {
+      if (err.code === 'ALREADY_CLAIMED') setPosted(true)
+      setShareNote(err.message)
+    } finally {
+      setPosting(false)
+    }
+  }
+
   async function share() {
+    const where = Number(session.level.id) === 0 ? '每日挑战' : `第 ${session.level.id} 关`
     const text = won
-      ? `我在开心消消乐通过了第 ${session.level.id} 关，得分 ${session.score}，${session.stars} 星。`
-      : `我在开心消消乐第 ${session.level.id} 关得了 ${session.score} 分。`
+      ? `我在开心消消乐通过了${where}，得分 ${session.score}，${session.stars} 星。`
+      : `我在开心消消乐${where}得了 ${session.score} 分。`
     if (navigator.share) {
       try {
         await navigator.share({ title: '开心消消乐', text })
@@ -69,7 +88,7 @@ export function ResultDialog({ session }) {
         <h2>{STATUS_TEXT[session.status] ?? '对局结束'}</h2>
         <Stars value={session.stars} />
         <p>
-          第 {session.level.id} 关 {session.level.name}
+          {Number(session.level.id) === 0 ? session.level.name : `第 ${session.level.id} 关 ${session.level.name}`}
         </p>
         <p className="muted">
           得分 {session.score}，剩余步数 {session.movesLeft}
@@ -78,26 +97,46 @@ export function ResultDialog({ session }) {
         {tools ? (
           <p>
             获得 {tools}
-            {session.level.id % 20 === 0 ? <span className="muted">（本章最后一关首次星级奖励）</span> : null}
+            {session.level.id > 0 && session.level.id % 20 === 0 ? (
+              <span className="muted">（本章最后一关首次星级奖励）</span>
+            ) : null}
           </p>
         ) : null}
-        {shareNote ? <p className="muted">{shareNote}</p> : null}
         {blocked ? <p className="form-error">{blocked}</p> : null}
-        <div className="actions">
+        <div className="result-actions">
           {won && nextId ? (
-            <button type="button" className="btn" onClick={() => enter(nextId)}>
-              下一关
+            <>
+              <button type="button" className="btn" onClick={() => enter(nextId)}>
+                下一关
+              </button>
+              <div className="result-pair">
+                <button type="button" className="btn btn-ghost" onClick={() => enter(session.level.id)}>
+                  再玩一次
+                </button>
+                <Link to="/levels" className="btn btn-ghost">
+                  返回关卡
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn" onClick={() => enter(session.level.id)}>
+                再玩一次
+              </button>
+              <Link to="/levels" className="btn btn-ghost">
+                返回关卡
+              </Link>
+            </>
+          )}
+          <div className="result-share">
+            <button type="button" onClick={postToCommunity} disabled={posted || posting}>
+              {posted ? '已发到社区' : posting ? '发送中…' : '发到社区'}
             </button>
-          ) : null}
-          <button type="button" className="btn btn-ghost" onClick={() => enter(session.level.id)}>
-            再玩一次
-          </button>
-          <button type="button" className="btn btn-ghost" onClick={share}>
-            分享
-          </button>
-          <Link to="/levels" className="btn btn-ghost">
-            返回关卡
-          </Link>
+            <button type="button" onClick={share}>
+              分享
+            </button>
+          </div>
+          {shareNote ? <p className="muted">{shareNote}</p> : null}
         </div>
       </section>
     </div>

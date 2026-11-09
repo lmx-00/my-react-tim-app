@@ -1,8 +1,38 @@
+import crypto from 'node:crypto'
+
 export const STAMINA_MAX = 5
 export const STAMINA_REGEN_MS = 30 * 60 * 1000
 export const CHECK_IN_COINS = 50
 export const STREAK_GOAL = 7
-export const STREAK_BONUS = 100
+export const STREAK_GIFT = {
+  coins: 100,
+  diamonds: 10,
+  tools: { hammer: 1 },
+}
+
+export const CHECK_IN_WHEEL = [
+  { id: 'coins-30', label: '30金币', color: '#ffc2dd', weight: 28, reward: { coins: 30 } },
+  { id: 'coins-50', label: '50金币', color: '#fff0f6', weight: 24, reward: { coins: 50 } },
+  { id: 'coins-100', label: '100金币', color: '#ffe08a', weight: 14, reward: { coins: 100 } },
+  { id: 'shuffle', label: '洗牌', color: '#c5ecff', weight: 14, reward: { tools: { shuffle: 1 } } },
+  { id: 'hammer', label: '锤子', color: '#ddd0ff', weight: 10, reward: { tools: { hammer: 1 } } },
+  { id: 'gems-10', label: '10钻石', color: '#9cf0dc', weight: 10, reward: { diamonds: 10 } },
+]
+
+export function publicPrize(prize) {
+  if (!prize) return null
+  return { id: prize.id, label: prize.label, color: prize.color, reward: prize.reward }
+}
+
+export function pickWheelPrize(roll) {
+  const total = CHECK_IN_WHEEL.reduce((sum, item) => sum + item.weight, 0)
+  let n = Number.isInteger(roll) ? roll : crypto.randomInt(total)
+  for (const prize of CHECK_IN_WHEEL) {
+    n -= prize.weight
+    if (n < 0) return prize
+  }
+  return CHECK_IN_WHEEL[CHECK_IN_WHEEL.length - 1]
+}
 
 export const CANDY_WEEK = {
   id: 'candy-week',
@@ -55,6 +85,26 @@ export const EVENTS = [
     days: 4,
     reward: { coins: 100 },
   },
+  {
+    id: 'harvest-week',
+    name: '收获周',
+    text: '领取 80 金币和 1 次洗牌。',
+    start: '2026-11-09T00:00:00+08:00',
+    days: 7,
+    reward: { coins: 80, tools: { shuffle: 1 } },
+  },
+]
+
+export const CONTINUE_DIAMONDS = [10, 15, 20]
+export const DAILY_REWARD = { coins: 80, tools: { shuffle: 1 } }
+export const STAMINA_GIFT = 1
+
+export const TUTORIALS = [
+  { id: 'tut-swap', levelId: 1, text: '点两只相邻的小动物，把三个一样的换到一起。' },
+  { id: 'tut-rocket', levelId: 2, text: '四个一排会变成火箭。火箭能消掉一整行或一整列。' },
+  { id: 'tut-collect', levelId: 3, text: '这一关要收集指定的小动物。消掉的会算进目标。' },
+  { id: 'tut-ice', levelId: 6, text: '结冰的不能换。旁边消掉会敲一层冰，小动物还在。' },
+  { id: 'tut-crate', levelId: 11, text: '木箱不能换。旁边消掉敲一层，敲完才消失。' },
 ]
 
 export const DAILY_TASKS = [

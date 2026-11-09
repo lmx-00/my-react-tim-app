@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { applyHammer, applyPlus, applyShuffle, applySwap, createSession, playMove, quitSession, undoMove } from '../api/game.js'
+import {
+  applyHammer,
+  applyPlus,
+  applyShuffle,
+  applySwap,
+  createSession,
+  dismissTutorial,
+  playMove,
+  quitSession,
+  undoMove,
+} from '../api/game.js'
 import { Board } from '../components/Board.jsx'
+import { ContinueDialog } from '../components/ContinueDialog.jsx'
 import { ResultDialog } from '../components/ResultDialog.jsx'
 import { buildFrames } from '../game/replay.js'
 import { playSound } from '../game/sound.js'
@@ -12,17 +23,25 @@ const SWAP_MS = 180
 const SWAP_SETTLE_MS = SWAP_MS + 40
 const STEP_MS = 270
 
+function toolParts(tools, key) {
+  const free = Number(tools?.free?.[key] ?? tools?.[key] ?? 0)
+  const bag = Number(tools?.bag?.[key] ?? 0)
+  return { free, bag }
+}
+
 function toolFace(name, tools, key) {
-  const free = tools?.free?.[key]
-  const bag = tools?.bag?.[key] ?? 0
-  if (free == null || bag <= 0) return `${name} ${tools?.[key] ?? 0}`
+  const { free, bag } = toolParts(tools, key)
   return (
-    <span className="tool-count">
+    <span className="tool-face">
       <span>{name}</span>
-      <small>本局 {free}</small>
-      <small>背包 {bag}</small>
+      <strong>{bag > 0 ? `${free}+${bag}` : free}</strong>
     </span>
   )
+}
+
+function toolTitle(name, tools, key) {
+  const { free, bag } = toolParts(tools, key)
+  return bag > 0 ? `${name} 本局 ${free}，背包 ${bag}` : `${name} ${free}`
 }
 
 function isAdjacent(a, b) {
@@ -46,6 +65,8 @@ export function PlayPage() {
   const [tool, setTool] = useState(null)
   const [paused, setPaused] = useState(false)
   const [error, setError] = useState('')
+  const [note, setNote] = useState('')
+  const [showHint, setShowHint] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -115,16 +136,7 @@ export function PlayPage() {
       const applyResult = () =>
         setSession((current) => ({
           ...current,
-          board: result.board,
-          score: result.score,
-          movesLeft: result.movesLeft,
-          goalProgress: result.goalProgress,
-          status: result.status,
-          stars: result.stars,
-          canUndo: result.canUndo,
-          tools: result.tools ?? current.tools,
-          rewardCoins: result.rewardCoins ?? 0,
-          rewardTools: result.rewardTools ?? {},
+          ...result,
         }))
 
       if (!result.valid) {
@@ -144,6 +156,12 @@ export function PlayPage() {
         setView(null)
         setCombo(null)
         applyResult()
+        const shuffled = (result.events ?? []).filter((event) => event.type === 'shuffle')
+        if (shuffled.length && (result.events?.length ?? 0) > 1) {
+          setNote('没有可以消的了，已重新洗牌')
+        } else {
+          setNote('')
+        }
       }
     } catch (err) {
       setSwap(null)
@@ -295,6 +313,29 @@ export function PlayPage() {
     navigate('/levels')
   }
 
+  async function closeTutorial() {
+    if (!session?.tutorial) return
+    try {
+      await dismissTutorial(session.tutorial.id)
+    } catch {
+      // 关掉即可
+    }
+    setSession((current) => (current ? { ...current, tutorial: null } : current))
+  }
+
+  const ended = session?.status === 'won' || session?.status === 'lost'
+  const stalled = session?.status === 'playing' && session.movesLeft <= 0
+
+  useEffect(() => {
+    if (!session || busy || paused || ended || stalled || session.tutorial) {
+      setShowHint(false)
+      return undefined
+    }
+    setShowHint(false)
+    const timer = window.setTimeout(() => setShowHint(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [session, busy, paused, ended, stalled])
+
   if (error && !session) {
     return (
       <section className="stack">
@@ -307,45 +348,55 @@ export function PlayPage() {
   if (!session) {
     return (
       <section className="stack">
-        <p className="muted">正在进入第 {levelId} 关…</p>
+        <p className="muted">{Number(levelId) === 0 ? '正在进入每日挑战…' : `正在进入第 ${levelId} 关…`}</p>
       </section>
     )
   }
 
-  const ended = session.status === 'won' || session.status === 'lost'
   const lowMoves = session.movesLeft <= 5
+  const daily = Number(session.level.id) === 0
 
   return (
     <section className="stack play-stack">
       <div className="hud">
         <div className="hud-main">
-          <h1>
-            第 {session.level.id} 关 {session.level.name}
-          </h1>
+          <h1>{daily ? session.level.name : `第 ${session.level.id} 关 ${session.level.name}`}</h1>
           <p>目标：{goalText(session.level)}</p>
           <p className="hud-progress">{goalProgressText(session.level, session.score, session.goalProgress)}</p>
         </div>
-        <div className="hud-stats">
-          <span>
-            <small>分数</small>
-            <strong>{session.score}</strong>
-          </span>
-          <span className={lowMoves ? 'is-danger' : ''}>
-            <small>步数</small>
-            <strong>{session.movesLeft}</strong>
-          </span>
+        <div className="hud-side">
+          <div className="hud-stats">
+            <span>
+              <small>分数</small>
+              <strong>{session.score}</strong>
+            </span>
+            <span className={lowMoves ? 'is-danger' : ''}>
+              <small>步数</small>
+              <strong>{session.movesLeft}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            className="hud-pause"
+            onClick={() => setPaused(true)}
+            disabled={busy || ended}
+          >
+            暂停
+          </button>
         </div>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
+      {note ? <p className="muted">{note}</p> : null}
       <div className="board-wrap">
         <Board
           board={view ? { ...session.board, cells: view.cells } : session.board}
           selected={selected}
           onSelect={handleSelect}
-          disabled={busy || paused || ended}
+          disabled={busy || paused || ended || stalled}
           shaking={shaking}
           swap={swap}
           effects={view}
+          hint={showHint ? session.hint : null}
         />
         {combo ? (
           <p className={`combo${combo.banner ? ' is-banner' : ''}`} key={`${combo.banner ?? ''}-${combo.wave}-${combo.score}`}>
@@ -355,11 +406,14 @@ export function PlayPage() {
       </div>
       <div className="tool-bar">
         <button type="button" className="btn btn-ghost" onClick={handleUndo} disabled={busy || ended || !session.canUndo}>
-          后退
+          <span className="tool-face">
+            <span>后退</span>
+          </span>
         </button>
         <button
           type="button"
           className={`btn btn-ghost${tool === 'hammer' ? ' is-on' : ''}`}
+          title={toolTitle('锤子', session.tools, 'hammer')}
           onClick={() => setTool((current) => (current === 'hammer' ? null : 'hammer'))}
           disabled={busy || ended || !session.tools?.hammer}
         >
@@ -368,6 +422,7 @@ export function PlayPage() {
         <button
           type="button"
           className="btn btn-ghost"
+          title={toolTitle('洗牌', session.tools, 'shuffle')}
           onClick={handleShuffle}
           disabled={busy || ended || !session.tools?.shuffle}
         >
@@ -376,6 +431,7 @@ export function PlayPage() {
         <button
           type="button"
           className={`btn btn-ghost${tool === 'swap' ? ' is-on' : ''}`}
+          title={toolTitle('交换', session.tools, 'swap')}
           onClick={() => setTool((current) => (current === 'swap' ? null : 'swap'))}
           disabled={busy || paused || ended || !session.tools?.swap}
         >
@@ -384,22 +440,15 @@ export function PlayPage() {
         <button
           type="button"
           className="btn btn-ghost"
+          title={toolTitle('加五步', session.tools, 'plus')}
           onClick={handlePlus}
           disabled={busy || ended || !session.tools?.plus}
         >
-          {toolFace('加五步', session.tools, 'plus')}
+          {toolFace('加步', session.tools, 'plus')}
         </button>
       </div>
-      {tool === 'hammer' ? <p className="muted">结冰的小动物拖不动。锤子敲一下只碎一层冰，小动物还在。不扣步数。</p> : null}
-      {tool === 'swap' ? <p className="muted">点两个没结冰的格子对调。消得掉就消除，消不掉也留在新位置。不扣步数。</p> : null}
-      <div className="actions">
-        <button type="button" className="btn btn-ghost" onClick={() => setPaused(true)} disabled={busy || ended}>
-          暂停
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={handleQuit} disabled={busy}>
-          返回关卡
-        </button>
-      </div>
+      {tool === 'hammer' ? <p className="muted tool-hint">结冰的小动物拖不动。锤子敲一下只碎一层冰，小动物还在。不扣步数。</p> : null}
+      {tool === 'swap' ? <p className="muted tool-hint">点两个没结冰的格子对调。消得掉就消除，消不掉也留在新位置。不扣步数。</p> : null}
       {paused && !ended ? (
         <div className="cashier-mask">
           <section className="cashier" role="dialog" aria-label="暂停">
@@ -415,6 +464,23 @@ export function PlayPage() {
             </div>
           </section>
         </div>
+      ) : null}
+      {session.tutorial ? (
+        <div className="cashier-mask" role="presentation">
+          <section className="cashier result-dialog" role="dialog" aria-label="说明">
+            <p className="eyebrow">这一关</p>
+            <h2>{daily ? '每日挑战' : `第 ${session.level.id} 关`}</h2>
+            <p>{session.tutorial.text}</p>
+            <div className="actions">
+              <button type="button" className="btn" onClick={closeTutorial}>
+                知道了
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {stalled && !ended ? (
+        <ContinueDialog session={session} onUpdate={setSession} onQuit={handleQuit} />
       ) : null}
       {ended ? <ResultDialog session={session} /> : null}
     </section>

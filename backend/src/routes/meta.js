@@ -3,7 +3,7 @@ import { asyncHandler, ok } from '../lib/errors.js'
 import { friendSchema, leaderboardQuerySchema, settingsSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { adminRequired, authRequired } from '../middleware/auth.js'
-import { addFriend, getSiteSettings, listLeaderboard, removeFriend, setSiteSettings } from '../services/gameService.js'
+import { addFriend, getAlbum, getSiteSettings, giftStamina, listLeaderboard, removeFriend, setSiteSettings } from '../services/gameService.js'
 
 export const metaRouter = Router()
 
@@ -45,6 +45,23 @@ metaRouter.post(
   asyncHandler(async (req, res) => {
     const body = parseWith(friendSchema, req.body)
     ok(res, await addFriend(req.user.id, body.username))
+  }),
+)
+
+metaRouter.post(
+  '/friends/stamina',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const body = parseWith(friendSchema, req.body)
+    ok(res, await giftStamina(req.user.id, body.username))
+  }),
+)
+
+metaRouter.get(
+  '/album',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await getAlbum(req.user.id))
   }),
 )
 

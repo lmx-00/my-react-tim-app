@@ -1,6 +1,6 @@
 const CRAFTED = [
-  { id: 1, name: '初入森林', rows: 8, cols: 8, colorCount: 6, moveLimit: 20, goalType: 'score', goalPayload: { score: 1450 }, twoStarMoves: 6, threeStarMoves: 9 },
-  { id: 2, name: '小试牛刀', rows: 8, cols: 8, colorCount: 6, moveLimit: 24, goalType: 'score', goalPayload: { score: 2050 }, twoStarMoves: 7, threeStarMoves: 12 },
+  { id: 1, name: '初入森林', rows: 8, cols: 8, colorCount: 4, moveLimit: 22, goalType: 'score', goalPayload: { score: 900 }, twoStarMoves: 8, threeStarMoves: 12 },
+  { id: 2, name: '小试牛刀', rows: 8, cols: 8, colorCount: 5, moveLimit: 24, goalType: 'score', goalPayload: { score: 1600 }, twoStarMoves: 7, threeStarMoves: 12 },
   { id: 3, name: '收集小熊', rows: 8, cols: 8, colorCount: 6, moveLimit: 20, goalType: 'collect', goalPayload: { bear: 10 }, twoStarMoves: 7, threeStarMoves: 12 },
   { id: 4, name: '双色收集', rows: 8, cols: 8, colorCount: 6, moveLimit: 22, goalType: 'collect', goalPayload: { bear: 13, cat: 11 }, twoStarMoves: 6, threeStarMoves: 9 },
   { id: 5, name: '步数压力', rows: 8, cols: 8, colorCount: 6, moveLimit: 16, goalType: 'score', goalPayload: { score: 1350 }, twoStarMoves: 4, threeStarMoves: 8 },
@@ -33,6 +33,18 @@ const CRAFTED = [
 
 export const CHAPTER_SIZE = 20
 export const LEVEL_COUNT = 1000
+export const DAILY_LEVEL_ID = 0
+
+export function isDailyLevel(id) {
+  return Number(id) === DAILY_LEVEL_ID
+}
+
+export function localDayKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const ANIMALS = ['bear', 'cat', 'fox', 'frog', 'chick', 'owl']
 const CHAPTERS = [
@@ -75,12 +87,20 @@ function buildLevel(id) {
 
   const animal = ANIMALS[id % ANIMALS.length]
   const extra = Math.min(6, Math.floor(id / 160))
-  const pattern = id % 4
+  const pattern = id % 5
   let goalType = 'score'
   let goalPayload
   let moveLimit = breath ? 24 : boss ? 20 : 22
 
-  if (pattern === 1 || pattern === 3) {
+  if (id >= 40 && pattern === 2) {
+    goalType = 'ice'
+    goalPayload = { ice: true }
+    moveLimit += 2
+  } else if (id >= 50 && pattern === 4) {
+    goalType = 'crate'
+    goalPayload = { crate: true }
+    moveLimit += 2
+  } else if (pattern === 1 || pattern === 3) {
     goalType = 'collect'
     const count = Math.min(16, (breath ? 8 : 10) + extra + (boss ? 2 : 0))
     if (pattern === 3) {
@@ -125,28 +145,77 @@ const BY_ID = new Map(LEVELS.map((level) => [level.id, level]))
 
 export const MAX_LEVEL_ID = LEVEL_COUNT
 
+function hashDay(key) {
+  let n = 2166136261
+  for (let i = 0; i < key.length; i += 1) n = Math.imul(n ^ key.charCodeAt(i), 16777619)
+  return n >>> 0
+}
+
+export function dailyLevel(now = new Date()) {
+  const dailyKey = localDayKey(now)
+  const seed = hashDay(dailyKey)
+  const templateId = 50 + (seed % 120)
+  const base = buildLevel(templateId)
+  return {
+    ...base,
+    id: DAILY_LEVEL_ID,
+    name: '每日挑战',
+    obstacleLevel: templateId,
+    dailyKey,
+  }
+}
+
 export function getLevelConfig(id) {
+  if (isDailyLevel(id)) return dailyLevel()
   return BY_ID.get(Number(id)) ?? null
 }
 
-export function emptyGoalProgress(level) {
+export function countIceLayers(board) {
+  if (!board?.cells) return 0
+  let total = 0
+  for (const row of board.cells) {
+    for (const cell of row) {
+      total += Number(cell?.ice || (cell?.snow ? 1 : 0) || 0)
+    }
+  }
+  return total
+}
+
+export function countCrateLayers(board) {
+  if (!board?.cells) return 0
+  let total = 0
+  for (const row of board.cells) {
+    for (const cell of row) {
+      if (cell?.type === 'crate') total += Number(cell.layers ?? 1)
+    }
+  }
+  return total
+}
+
+export function emptyGoalProgress(level, board) {
   if (level.goalType === 'score') return { score: 0 }
+  if (level.goalType === 'ice') return { ice: countIceLayers(board) }
+  if (level.goalType === 'crate') return { crate: countCrateLayers(board) }
   const progress = {}
-  for (const key of Object.keys(level.goalPayload)) progress[key] = 0
+  for (const key of Object.keys(level.goalPayload ?? {})) progress[key] = 0
   return progress
 }
 
-export function isGoalMet(level, score, collected) {
+export function isGoalMet(level, score, collected, board) {
   if (level.goalType === 'score') return score >= level.goalPayload.score
+  if (level.goalType === 'ice') return countIceLayers(board) === 0
+  if (level.goalType === 'crate') return countCrateLayers(board) === 0
   return Object.entries(level.goalPayload).every(
-    ([type, need]) => (collected[type] ?? 0) >= need,
+    ([type, need]) => type !== 'ice' && type !== 'crate' && (collected[type] ?? 0) >= need,
   )
 }
 
-export function buildGoalProgress(level, score, collected) {
+export function buildGoalProgress(level, score, collected, board) {
   if (level.goalType === 'score') return { score }
+  if (level.goalType === 'ice') return { ice: countIceLayers(board) }
+  if (level.goalType === 'crate') return { crate: countCrateLayers(board) }
   const progress = {}
-  for (const key of Object.keys(level.goalPayload)) {
+  for (const key of Object.keys(level.goalPayload ?? {})) {
     progress[key] = collected[key] ?? 0
   }
   return progress

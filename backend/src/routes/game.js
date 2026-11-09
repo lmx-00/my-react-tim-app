@@ -1,11 +1,14 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
-import { createSessionSchema, hammerSchema, moveSchema } from '../lib/schemas.js'
+import { createSessionSchema, hammerSchema, moveSchema, tutorialSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { authRequired } from '../middleware/auth.js'
 import {
+  continueSession,
   createSession,
+  dismissTutorial,
   getSession,
+  giveUpSession,
   playMove,
   quitSession,
   undoMove,
@@ -90,5 +93,30 @@ gameRouter.post(
   asyncHandler(async (req, res) => {
     const move = parseWith(moveSchema, req.body)
     ok(res, await useSwapTool(req.user.id, req.params.id, move))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/continue',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await continueSession(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/sessions/:id/give-up',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    ok(res, await giveUpSession(req.user.id, req.params.id))
+  }),
+)
+
+gameRouter.post(
+  '/tutorial',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const { id } = parseWith(tutorialSchema, req.body)
+    ok(res, await dismissTutorial(req.user.id, id))
   }),
 )

@@ -54,7 +54,11 @@ export const wechatAuthSchema = z.object({
 })
 
 export const createSessionSchema = z.object({
-  levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID),
+  levelId: z.coerce.number().int().min(0).max(MAX_LEVEL_ID),
+})
+
+export const tutorialSchema = z.object({
+  id: z.string().min(1).max(32),
 })
 
 export const moveSchema = z.object({
@@ -92,7 +96,7 @@ export const recordsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
   result: z.enum(['won', 'lost', 'quit', 'expired']).optional(),
-  levelId: z.coerce.number().int().min(1).max(MAX_LEVEL_ID).optional(),
+  levelId: z.coerce.number().int().min(0).max(MAX_LEVEL_ID).optional(),
 })
 
 export const leaderboardQuerySchema = z.object({
@@ -104,4 +108,30 @@ export const leaderboardQuerySchema = z.object({
 
 export const friendSchema = z.object({
   username: z.string().trim().min(1).max(32),
+})
+
+export const communityQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(30).default(12),
+  scope: z.enum(['all', 'friends', 'me']).optional(),
+})
+
+export const postCreateSchema = z
+  .object({
+    body: z.string().max(140, '最多 140 个字').optional(),
+    imageUrl: z
+      .string()
+      .regex(/^\/api\/uploads\/community\/[0-9a-f-]{36}\.(jpg|png|webp)$/i, '照片不对')
+      .optional(),
+    levelId: z.coerce.number().int().min(0).max(MAX_LEVEL_ID).optional(),
+    sessionId: z.string().uuid().optional(),
+  })
+  .refine(
+    (data) =>
+      Boolean(String(data.body ?? '').trim()) || Boolean(data.sessionId) || Boolean(data.imageUrl),
+    { message: '写一句或加一张照片' },
+  )
+
+export const commentCreateSchema = z.object({
+  body: z.string().trim().min(1, '写一句再说').max(80, '最多 80 个字'),
 })

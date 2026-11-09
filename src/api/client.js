@@ -13,18 +13,35 @@ export function onAuthChange(listener) {
   authListener = listener
 }
 
+function payload(body, headers = {}) {
+  if (body instanceof Blob) {
+    return {
+      headers: { 'Content-Type': body.type || 'application/octet-stream', ...headers },
+      body,
+    }
+  }
+  if (body instanceof FormData) {
+    return { headers, body }
+  }
+  if (body === undefined) return { headers, body: undefined }
+  return {
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  }
+}
+
 async function request(path, options = {}) {
   const { token, body, headers, ...rest } = options
   const accessToken = token ?? authToken
+  const packed = payload(body, headers)
 
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...headers,
+      ...packed.headers,
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: packed.body,
     ...rest,
   })
 

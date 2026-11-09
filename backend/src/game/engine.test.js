@@ -88,9 +88,9 @@ describe('match-3 engine', () => {
     assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 0)
   })
 
-  it('plants one rainbow bomb from level 2', () => {
+  it('plants one rainbow bomb from level 9', () => {
     const rng = createRng(99)
-    const board = createBoard({ id: 2, rows: 8, cols: 8, colorCount: 6 }, rng)
+    const board = createBoard({ id: 9, rows: 8, cols: 8, colorCount: 6 }, rng)
     assert.equal(board.cells.flat().filter((tile) => tile?.type === 'rainbow').length, 1)
   })
 
@@ -215,5 +215,12 @@ describe('match-3 engine', () => {
     assert.equal(result.valid, true)
     assert.equal(result.board.cells[0][1].type, 'owl')
     assert.equal(result.board.cells[0][1].ice, 1)
+    assert.equal(result.collected.ice, 1)
+  })
+
+  it('does not plant ice on early tutorial boards', () => {
+    const board = createBoard({ id: 1, rows: 8, cols: 8, colorCount: 4 }, createRng(9))
+    const iced = board.cells.flat().some((cell) => cell?.ice)
+    assert.equal(iced, false)
   })
 })

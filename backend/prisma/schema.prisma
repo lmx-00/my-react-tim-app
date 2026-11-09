@@ -32,8 +32,12 @@ model User {
   claimedOffers Json          @default("[]")
   tools        Json           @default("{\"hammer\":0,\"shuffle\":0,\"swap\":0}")
   friends      Json           @default("[]")
+  album        Json           @default("{}")
   mails        Mail[]
   orders       Order[]
+  posts        Post[]
+  postLikes    PostLike[]
+  postComments PostComment[]
 }
 
 model RefreshToken {
@@ -139,4 +143,45 @@ model SmsCode {
 model Setting {
   key   String @id
   value Json
+}
+
+model Post {
+  id        String        @id @default(uuid())
+  userId    String
+  body      String
+  imageUrl  String?
+  levelId   Int?
+  score     Int?
+  stars     Int?
+  result    String?
+  sessionId String?       @unique
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes     PostLike[]
+  comments  PostComment[]
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
 }

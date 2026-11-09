@@ -63,14 +63,40 @@ export function applyPlus(sessionId) {
   return api(`/game/sessions/${sessionId}/plus`, { method: 'POST' })
 }
 
+export function continueSession(sessionId) {
+  return api(`/game/sessions/${sessionId}/continue`, { method: 'POST' })
+}
+
+export function giveUpSession(sessionId) {
+  return api(`/game/sessions/${sessionId}/give-up`, { method: 'POST' })
+}
+
+export function dismissTutorial(id) {
+  return api('/game/tutorial', { method: 'POST', body: { id } })
+}
+
+export function getAlbum() {
+  return api('/album')
+}
+
+export function giftStamina(username) {
+  return api('/friends/stamina', { method: 'POST', body: { username } })
+}
+
 export const NO_STAMINA_TEXT = '体力不足，过一会儿会恢复，也可以去商店补充'
 
 // 体力用完时，只有这一关还开着没下完的对局才能进去接着玩
 export async function staminaBlocked(levelId, playingLevelIds) {
+  const id = Number(levelId)
+  const levels = playingLevelIds ? null : await listLevels()
+  const playing = playingLevelIds ?? levels?.playingLevelIds ?? []
+  if (playing.includes(id)) return false
+  if (id === 0) {
+    const daily = levels?.daily ?? (await listLevels()).daily
+    if (daily && !daily.tried) return false
+  }
   const wallet = await getWallet()
-  if (wallet.stamina > 0) return false
-  const playing = playingLevelIds ?? (await listLevels()).playingLevelIds ?? []
-  return !playing.includes(Number(levelId))
+  return wallet.stamina <= 0
 }
 
 export function getLeaderboard({ page = 1, pageSize = 50, scope = 'all', levelId } = {}) {
@@ -164,4 +190,37 @@ export function createRecharge(productId) {
 
 export function payRecharge(id, channel) {
   return api(`/recharge/${id}/pay`, { method: 'POST', body: { channel } })
+}
+
+export function listPosts({ page = 1, pageSize = 12, scope = 'all' } = {}) {
+  const params = { page, pageSize, scope }
+  return api(`/community/posts?${new URLSearchParams(params)}`)
+}
+
+export function createPost(body) {
+  return api('/community/posts', { method: 'POST', body })
+}
+
+export function uploadPhoto(blob) {
+  return api('/community/photos', { method: 'POST', body: blob })
+}
+
+export function likePost(id) {
+  return api(`/community/posts/${id}/like`, { method: 'POST' })
+}
+
+export function deletePost(id) {
+  return api(`/community/posts/${id}`, { method: 'DELETE' })
+}
+
+export function listComments(id) {
+  return api(`/community/posts/${id}/comments`)
+}
+
+export function createComment(id, text) {
+  return api(`/community/posts/${id}/comments`, { method: 'POST', body: { body: text } })
+}
+
+export function deleteComment(id) {
+  return api(`/community/comments/${id}`, { method: 'DELETE' })
 }

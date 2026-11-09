@@ -140,6 +140,14 @@ export function ProfilePage() {
           <span>背包</span>
           <span aria-hidden="true">›</span>
         </Link>
+        <Link className="account-link" to="/album">
+          <span>图鉴</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <Link className="account-link" to="/community">
+          <span>社区</span>
+          <span aria-hidden="true">›</span>
+        </Link>
         <Link className="account-link" to="/records">
           <span>记录</span>
           <span aria-hidden="true">›</span>

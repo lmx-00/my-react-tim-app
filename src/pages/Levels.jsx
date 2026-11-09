@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { NO_STAMINA_TEXT, listLevels, staminaBlocked } from '../api/game.js'
-import { Stars } from '../components/Stars.jsx'
+import { MapGrove, MapProp, MapSky, propKind, propSide } from '../components/MapLand.jsx'
 import { goalText } from '../game/tiles.js'
 
 const CHAPTER_SIZE = 20
@@ -10,7 +10,7 @@ const CHAPTERS = [
   '城堡', '迷宫', '云端', '熔岩', '竹林', '月夜', '彩虹', '龙巢',
 ]
 const LOCKED_CANDY = ['#fb7185', '#c4b5fd', '#7ee0c8', '#67e8f9', '#93c5fd', '#f9a8d4']
-const WAVE = [50, 32, 18, 36, 54, 72, 84, 64]
+const WAVE = [28, 36, 50, 66, 78, 82, 74, 58, 42, 30, 24, 32, 48, 64, 76, 70]
 
 function vineCurve(from, to) {
   if (to <= from) return ''
@@ -33,6 +33,7 @@ function chapterTitle(index) {
 }
 
 const STEP = 96
+const MAP_PAD = 84
 
 export function LevelsPage() {
   const navigate = useNavigate()
@@ -40,22 +41,23 @@ export function LevelsPage() {
   const scrollerRef = useRef(null)
   const [levels, setLevels] = useState([])
   const [playingLevelIds, setPlayingLevelIds] = useState([])
+  const [daily, setDaily] = useState(null)
   const [range, setRange] = useState({ start: 0, end: 16 })
   const [away, setAway] = useState(null)
   const [error, setError] = useState(location.state?.notice ?? '')
   const [loading, setLoading] = useState(true)
 
   function syncRange(node) {
-    const start = Math.max(0, Math.floor(node.scrollTop / STEP) - 3)
-    const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight) / STEP) + 4)
+    const start = Math.max(0, Math.floor((node.scrollTop - MAP_PAD) / STEP) - 3)
+    const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight - MAP_PAD) / STEP) + 4)
     setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
     const currentIndex = levels.findIndex((level) => level.status === 'current')
     if (currentIndex < 0) {
       setAway(null)
       return
     }
-    const top = node.scrollTop / STEP
-    const bottom = (node.scrollTop + node.clientHeight) / STEP
+    const top = (node.scrollTop - MAP_PAD) / STEP
+    const bottom = (node.scrollTop + node.clientHeight - MAP_PAD) / STEP
     const spot = currentIndex + 0.5
     if (spot < top + 0.4) setAway('up')
     else if (spot > bottom - 0.4) setAway('down')
@@ -69,6 +71,7 @@ export function LevelsPage() {
         if (cancelled) return
         setLevels(data.levels)
         setPlayingLevelIds(data.playingLevelIds ?? [])
+        setDaily(data.daily ?? null)
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -86,9 +89,9 @@ export function LevelsPage() {
     if (!node || !levels.length) return
     const current = levels.findIndex((level) => level.status === 'current')
     const index = current >= 0 ? current : 0
-    node.scrollTop = Math.max(0, index * STEP - node.clientHeight * 0.32)
-    const start = Math.max(0, Math.floor(node.scrollTop / STEP) - 3)
-    const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight) / STEP) + 4)
+    node.scrollTop = Math.max(0, index * STEP + MAP_PAD - node.clientHeight * 0.32)
+    const start = Math.max(0, Math.floor((node.scrollTop - MAP_PAD) / STEP) - 3)
+    const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight - MAP_PAD) / STEP) + 4)
     setRange({ start, end })
   }, [levels])
 
@@ -104,7 +107,7 @@ export function LevelsPage() {
     const node = scrollerRef.current
     const index = levels.findIndex((level) => level.status === 'current')
     if (!node || index < 0) return
-    node.scrollTo({ top: Math.max(0, index * STEP - node.clientHeight * 0.32), behavior: 'smooth' })
+    node.scrollTo({ top: Math.max(0, index * STEP + MAP_PAD - node.clientHeight * 0.32), behavior: 'smooth' })
   }
 
   async function openLevel(level) {
@@ -132,7 +135,7 @@ export function LevelsPage() {
         <div>
           <p className="eyebrow">{levels.length ? `第 ${seenChapter + 1} 章` : '关卡'}</p>
           <h1>{levels.length ? chapterTitle(seenChapter) : '关卡'}</h1>
-          {levels.length ? <p className="muted">已通关 {cleared}/{levels.length}。每章最后一关首次三星送锤子，两星送洗牌。</p> : null}
+          {levels.length ? <p className="muted">已通关 {cleared}/{levels.length}</p> : null}
         </div>
       </div>
       {levels.length ? (
@@ -142,9 +145,21 @@ export function LevelsPage() {
       ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       {loading ? <p className="muted">关卡加载中…</p> : null}
+      {daily ? (
+        <button
+          type="button"
+          className="daily-entry"
+          onClick={() => openLevel({ id: 0, status: 'current' })}
+        >
+          <strong>每日挑战</strong>
+          <span>
+            {daily.won ? '今天已过关' : daily.playing ? '有一局还没下完' : daily.tried ? '再试要扣体力' : '今天第一局不扣体力'}
+          </span>
+        </button>
+      ) : null}
       <div className="vine-wrap">
       <div className="vine-scroll" ref={scrollerRef} onScroll={(event) => syncRange(event.currentTarget)}>
-        <div className="vine" style={{ '--steps': levels.length, '--step': `${STEP}px` }}>
+        <div className="vine" style={{ '--steps': levels.length, '--step': `${STEP}px`, '--map-pad': `${MAP_PAD}px` }}>
           {levels.length ? (
             <svg
               className="vine-svg"
@@ -152,38 +167,42 @@ export function LevelsPage() {
               preserveAspectRatio="none"
               aria-hidden="true"
               style={{
-                top: `calc(${pathFrom} * var(--step))`,
+                top: `calc(var(--map-pad) + ${pathFrom} * var(--step))`,
                 height: `calc(${pathTo - pathFrom + 1} * var(--step))`,
               }}
             >
+              <path className="vine-trail-edge" d={vineCurve(pathFrom, pathTo)} />
+              <path className="vine-trail" d={vineCurve(pathFrom, pathTo)} />
               <path className="vine-shade" d={vineCurve(pathFrom, pathTo)} />
               <path className="vine-stem" d={vineCurve(pathFrom, pathTo)} />
               <path className="vine-core" d={vineCurve(pathFrom, pathTo)} />
             </svg>
           ) : null}
+          {range.start === 0 ? <MapSky /> : null}
           {levels.slice(range.start, range.end).map((level) => {
             const index = level.id - 1
             const x = WAVE[index % WAVE.length]
-            const nextX = WAVE[(index + 1) % WAVE.length]
             const candy = LOCKED_CANDY[index % LOCKED_CANDY.length]
+            const kind = propKind(index, CHAPTER_SIZE)
             return (
               <Fragment key={level.id}>
-                {index < levels.length - 1 ? (
-                  <span
-                    className="vine-leaf"
+                {index % CHAPTER_SIZE === 0 ? (
+                  <MapGrove
+                    title={chapterTitle(index / CHAPTER_SIZE)}
+                    color={candy}
                     style={{
-                      left: `${(x + nextX) / 2}%`,
-                      top: `calc((${index} + 1) * var(--step))`,
-                      '--tilt': `${index % 2 === 0 ? 28 : -32}deg`,
+                      left: `${x > 50 ? 14 : 86}%`,
+                      top: `calc(var(--map-pad) + (${index} + 0.5) * var(--step))`,
                     }}
                   />
                 ) : null}
-                {index % 3 === 1 ? (
-                  <span
-                    className={`vine-bloom is-${index % 3}`}
+                {kind ? (
+                  <MapProp
+                    kind={kind}
+                    color={candy}
                     style={{
-                      left: `${x > 50 ? x - 16 : x + 16}%`,
-                      top: `calc((${index} + 0.15) * var(--step))`,
+                      left: `${propSide(x)}%`,
+                      top: `calc(var(--map-pad) + (${index} + 0.5) * var(--step))`,
                     }}
                   />
                 ) : null}
@@ -192,14 +211,11 @@ export function LevelsPage() {
                   className={`den is-${level.status}`}
                   style={{
                     left: `${x}%`,
-                    top: `calc((${index} + 0.5) * var(--step))`,
+                    top: `calc(var(--map-pad) + (${index} + 0.5) * var(--step))`,
                   }}
                   onClick={() => openLevel(level)}
                   aria-label={`${level.name}，${level.status === 'locked' ? '未解锁' : goalText(level)}`}
                 >
-                  {index % CHAPTER_SIZE === 0 ? (
-                    <span className="vine-sign">{chapterTitle(index / CHAPTER_SIZE)}</span>
-                  ) : null}
                   <span
                     className="den-face"
                     style={
@@ -210,9 +226,10 @@ export function LevelsPage() {
                   >
                     <strong>{level.id}</strong>
                   </span>
-                  <span className="den-name">{level.status === 'locked' ? '' : level.name}</span>
-                  {level.bestScore > 0 ? <span className="den-score">最高 {level.bestScore}</span> : null}
-                  {level.status === 'cleared' ? <Stars value={level.stars} /> : null}
+                  {level.status === 'cleared' && level.stars ? (
+                    <span className="den-stars">{'★'.repeat(level.stars)}</span>
+                  ) : null}
+                  {level.status === 'current' ? <span className="den-name">{level.name}</span> : null}
                 </button>
               </Fragment>
             )

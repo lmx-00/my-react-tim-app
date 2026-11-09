@@ -30,6 +30,14 @@ export function errorHandler(err, req, res, next) {
     return
   }
 
+  if (err?.status === 413 || err?.type === 'entity.too.large') {
+    res.status(400).json({
+      ok: false,
+      error: { code: 'TOO_LARGE', message: '照片太大了，换一张小一点的' },
+    })
+    return
+  }
+
   console.error(err)
   res.status(500).json({
     ok: false,

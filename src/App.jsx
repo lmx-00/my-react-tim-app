@@ -20,6 +20,8 @@ import { MailPage } from './pages/Mail.jsx'
 import { BagPage } from './pages/Bag.jsx'
 import { ActivityPage } from './pages/Activity.jsx'
 import { SettingsPage } from './pages/Settings.jsx'
+import { AlbumPage } from './pages/Album.jsx'
+import { CommunityPage } from './pages/Community.jsx'
 import { AgreementPage } from './pages/Agreement.jsx'
 import { PrivacyPage } from './pages/Privacy.jsx'
 
@@ -61,6 +63,8 @@ export default function App() {
               <Route path="/result/:sessionId" element={<ResultPage />} />
               <Route path="/shop" element={<ShopPage />} />
               <Route path="/bag" element={<BagPage />} />
+              <Route path="/album" element={<AlbumPage />} />
+              <Route path="/community" element={<CommunityPage />} />
               <Route path="/mail" element={<MailPage />} />
               <Route path="/activity" element={<ActivityPage />} />
               <Route path="/settings" element={<SettingsPage />} />

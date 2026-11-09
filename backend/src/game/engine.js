@@ -1,5 +1,7 @@
 import {
   BASE_TYPES,
+  CRATE_FROM_LEVEL,
+  ICE_FROM_LEVEL,
   RAINBOW_BLAST_RADIUS,
   SCORE,
   cellKey,
@@ -7,6 +9,7 @@ import {
   comboMultiplier,
   inBounds,
   matchColor,
+  obstacleLevel,
   parseKey,
   rainbowCountForLevel,
 } from './constants.js'
@@ -116,6 +119,11 @@ export function findLegalMoves(board) {
     }
   }
   return moves
+}
+
+export function pickHint(board) {
+  const [move] = findLegalMoves(board)
+  return move ? { x1: move.x1, y1: move.y1, x2: move.x2, y2: move.y2 } : null
 }
 
 function swapCells(board, y1, x1, y2, x2) {
@@ -383,13 +391,19 @@ function crackCrates(board, toClear, crateHits) {
   return cells
 }
 
-function settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits = new Set()) {
+function settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits = new Set(), collected = {}) {
   const events = []
   applyClears(board, toClear, spawns)
   const cracked = crackIce(board, toClear, iceHits)
-  if (cracked.length) events.push({ type: 'ice', cells: cracked })
+  if (cracked.length) {
+    events.push({ type: 'ice', cells: cracked })
+    collected.ice = (collected.ice ?? 0) + cracked.length
+  }
   const crates = crackCrates(board, toClear, crateHits)
-  if (crates.length) events.push({ type: 'crate', cells: crates })
+  if (crates.length) {
+    events.push({ type: 'crate', cells: crates })
+    collected.crate = (collected.crate ?? 0) + crates.length
+  }
   const drops = applyGravity(board)
   if (drops.length) events.push({ type: 'drop', moves: drops })
   const fills = fillBoard(board, rng, colorCount)
@@ -449,7 +463,7 @@ function resolveWaves(board, rng, colorCount, swapCells) {
       })
     }
 
-    events.push(...settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits))
+    events.push(...settleClears(board, rng, colorCount, toClear, spawns, iceHits, crateHits, collected))
 
     first = false
     wave += 1
@@ -527,7 +541,7 @@ function resolvePowerSwap(board, rng, colorCount, y1, x1, y2, x2) {
       score: waveScore,
       effect: waveEffect(extraScores),
     },
-    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits),
+    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits, collected),
   ]
 
   const rest = resolveWaves(board, rng, colorCount, null)
@@ -588,7 +602,7 @@ function resolveRainbowSwap(board, rng, colorCount, y1, x1, y2, x2) {
       wave: 1,
       score: waveScore,
     },
-    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits),
+    ...settleClears(board, rng, colorCount, toClear, {}, iceHits, crateHits, collected),
   ]
 
   const rest = resolveWaves(board, rng, colorCount, null)
@@ -687,16 +701,17 @@ function plantRainbowBombs(board, rng, count) {
 }
 
 function finishBoard(board, rng, levelConfig) {
+  const stage = obstacleLevel(levelConfig)
   plantRainbowBombs(board, rng, rainbowCountForLevel(levelConfig))
-  plantSnow(board, rng)
-  if ((levelConfig?.id ?? 0) >= 11) plantCrates(board, rng)
+  if (stage >= ICE_FROM_LEVEL) plantSnow(board, rng, levelConfig)
+  if (stage >= CRATE_FROM_LEVEL) plantCrates(board, rng, levelConfig)
   if (hasMatch(board) || findLegalMoves(board).length === 0) {
     shuffleBoard(board, rng, levelConfig.colorCount)
   }
   return board
 }
 
-function plantCrates(board, rng) {
+function plantCrates(board, rng, levelConfig) {
   const spots = []
   for (let row = 0; row < board.rows; row += 1) {
     for (let col = 0; col < board.cols; col += 1) {
@@ -705,7 +720,8 @@ function plantCrates(board, rng) {
       spots.push([row, col])
     }
   }
-  const count = Math.max(4, Math.round(spots.length / 8))
+  const dense = levelConfig?.goalType === 'crate'
+  const count = Math.max(dense ? 8 : 4, Math.round(spots.length / (dense ? 5 : 8)))
   for (let i = spots.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1))
     ;[spots[i], spots[j]] = [spots[j], spots[i]]
@@ -716,7 +732,7 @@ function plantCrates(board, rng) {
   }
 }
 
-function plantSnow(board, rng) {
+function plantSnow(board, rng, levelConfig) {
   const spots = []
   for (let row = 0; row < board.rows; row += 1) {
     for (let col = 0; col < board.cols; col += 1) {
@@ -725,7 +741,8 @@ function plantSnow(board, rng) {
       spots.push([row, col])
     }
   }
-  const count = Math.max(6, Math.round(spots.length / 5))
+  const dense = levelConfig?.goalType === 'ice'
+  const count = Math.max(dense ? 10 : 6, Math.round(spots.length / (dense ? 4 : 5)))
   for (let i = spots.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1))
     ;[spots[i], spots[j]] = [spots[j], spots[i]]
@@ -908,7 +925,7 @@ export function applyHammer(board, point, levelConfig, rng) {
         events: [{ type: 'crate', cells: [[y, x]] }],
         board: next,
         scoreDelta: 0,
-        collected: {},
+        collected: { crate: 1 },
       }
     }
     next.cells[y][x] = null
@@ -918,12 +935,14 @@ export function applyHammer(board, point, levelConfig, rng) {
     const fills = fillBoard(next, rng, levelConfig.colorCount)
     if (fills.length) events.push({ type: 'fill', cells: fills })
     const rest = resolveWaves(next, rng, levelConfig.colorCount, null)
+    const collected = { crate: 1, ...(rest.collected ?? {}) }
+    collected.crate = (rest.collected?.crate ?? 0) + 1
     return {
       valid: true,
       events: [...events, ...rest.events],
       board: next,
       scoreDelta: rest.scoreDelta,
-      collected: rest.collected,
+      collected,
     }
   }
 
@@ -935,7 +954,7 @@ export function applyHammer(board, point, levelConfig, rng) {
       events: [{ type: 'ice', cells: cracked }],
       board: next,
       scoreDelta: 0,
-      collected: {},
+      collected: { ice: cracked.length },
     }
   }
 
@@ -952,7 +971,7 @@ export function applyHammer(board, point, levelConfig, rng) {
       score: waveScore,
       effect: waveEffect(extraScores),
     },
-    ...settleClears(next, rng, levelConfig.colorCount, toClear, {}, iceHits, crateHits),
+    ...settleClears(next, rng, levelConfig.colorCount, toClear, {}, iceHits, crateHits, collected),
   ]
 
   const rest = resolveWaves(next, rng, levelConfig.colorCount, null)

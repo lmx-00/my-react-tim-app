@@ -19,6 +19,8 @@ export function tileLabel(tile) {
 export function goalText(level) {
   if (!level) return ''
   if (level.goalType === 'score') return `得分 ${level.goalPayload.score}`
+  if (level.goalType === 'ice') return '清除所有冰块'
+  if (level.goalType === 'crate') return '清除所有木箱'
   return Object.entries(level.goalPayload)
     .map(([type, count]) => `${TILE_NAME[type] ?? type} ${count}`)
     .join('、')
@@ -29,6 +31,8 @@ export function goalProgressText(level, score, goalProgress) {
   if (level.goalType === 'score') {
     return `${score} / ${level.goalPayload.score}`
   }
+  if (level.goalType === 'ice') return `冰还剩 ${goalProgress?.ice ?? 0} 层`
+  if (level.goalType === 'crate') return `木箱还剩 ${goalProgress?.crate ?? 0} 层`
   return Object.entries(level.goalPayload)
     .map(([type, need]) => `${TILE_NAME[type] ?? type} ${goalProgress?.[type] ?? 0}/${need}`)
     .join('  ')

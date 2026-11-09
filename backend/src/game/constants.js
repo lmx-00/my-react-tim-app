@@ -18,10 +18,17 @@ export const SCORE = {
 }
 
 export const RAINBOW_BLAST_RADIUS = 1
+export const ICE_FROM_LEVEL = 6
+export const CRATE_FROM_LEVEL = 11
+export const RAINBOW_FROM_LEVEL = 9
+
+export function obstacleLevel(levelConfig) {
+  return Number(levelConfig?.obstacleLevel ?? levelConfig?.id ?? 0)
+}
 
 export function rainbowCountForLevel(levelConfig) {
-  const id = Number(levelConfig?.id ?? 0)
-  if (id < 2) return 0
+  const id = obstacleLevel(levelConfig)
+  if (id < RAINBOW_FROM_LEVEL) return 0
   if (id >= 12) return 2
   return 1
 }

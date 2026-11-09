@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { addFriend, getLeaderboard, removeFriend } from '../api/game.js'
+import { Link } from 'react-router-dom'
+import { addFriend, getLeaderboard, giftStamina, removeFriend } from '../api/game.js'
 import { useAuth } from '../auth/useAuth.js'
 
 const PAGE_SIZE = 50
@@ -13,7 +14,7 @@ function Crown({ rank }) {
   )
 }
 
-function RankRow({ item, scoreMode, onRemove }) {
+function RankRow({ item, scoreMode, onRemove, onGift }) {
   return (
     <li className={`${item.me ? 'is-me' : ''} ${item.rank <= 3 ? `is-top is-${item.rank}` : ''}`}>
       <strong>
@@ -23,6 +24,11 @@ function RankRow({ item, scoreMode, onRemove }) {
       <span>{item.username}</span>
       <em>
         {scoreMode ? `${item.score} 分` : `${item.totalStars} 星 · ${item.maxCleared} 关`}
+        {onGift && !item.me ? (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => onGift(item.username)}>
+            送体力
+          </button>
+        ) : null}
         {onRemove && !item.me ? (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemove(item.username)}>
             移除
@@ -46,6 +52,7 @@ export function RankPage() {
   const [reload, setReload] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [note, setNote] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -79,6 +86,7 @@ export function RankPage() {
     setItems([])
     setLoading(true)
     setError('')
+    setNote('')
   }
 
   function lookUpLevel(event) {
@@ -115,6 +123,17 @@ export function RankPage() {
       setItems([])
       setLoading(true)
       setReload((value) => value + 1)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function gift(username) {
+    setError('')
+    setNote('')
+    try {
+      await giftStamina(username)
+      setNote(`已送给 ${username} 1 点体力`)
     } catch (err) {
       setError(err.message)
     }
@@ -207,15 +226,32 @@ export function RankPage() {
       ) : null}
 
       {error ? <p className="form-error">{error}</p> : null}
+      {note ? <p className="muted">{note}</p> : null}
       {loading && !items.length ? <p className="muted">排行加载中…</p> : null}
       {!loading && !error && !items.length ? (
-        <p className="muted">{tab === 'friends' ? '还没有好友。' : scoreMode ? '这一关还没有成绩。' : '还没有人上榜。'}</p>
+        <p className="muted">
+          {tab === 'friends' ? (
+            <>
+              还没有好友。加好友后每天可以送 1 点体力，也可以去<Link to="/community">社区</Link>看看。
+            </>
+          ) : scoreMode ? (
+            '这一关还没有成绩。'
+          ) : (
+            '还没有人上榜。'
+          )}
+        </p>
       ) : null}
 
       {items.length ? (
         <ol className="rank-list">
           {items.map((item) => (
-            <RankRow key={`${item.rank}-${item.username}`} item={item} scoreMode={scoreMode} onRemove={tab === 'friends' ? remove : null} />
+            <RankRow
+              key={`${item.rank}-${item.username}`}
+              item={item}
+              scoreMode={scoreMode}
+              onRemove={tab === 'friends' ? remove : null}
+              onGift={tab === 'friends' ? gift : null}
+            />
           ))}
           {showMine ? (
             <>

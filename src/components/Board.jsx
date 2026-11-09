@@ -32,7 +32,7 @@ function swapStyle(swap, x, y) {
   }
 }
 
-export function Board({ board, selected, onSelect, disabled, shaking, swap, effects }) {
+export function Board({ board, selected, onSelect, disabled, shaking, swap, effects, hint }) {
   if (!board) return null
   const popping = new Set(effects?.popping ?? [])
   const spawning = new Set(effects?.spawning ?? [])
@@ -58,6 +58,12 @@ export function Board({ board, selected, onSelect, disabled, shaking, swap, effe
           if (ice) classes.push(ice > 1 ? 'is-ice is-ice-2' : 'is-ice')
           if (tile?.type === 'rocket' && tile.dir) classes.push(`is-${tile.dir}`)
           if (selected?.x === x && selected?.y === y) classes.push('is-selected')
+          if (
+            hint &&
+            ((hint.x1 === x && hint.y1 === y) || (hint.x2 === x && hint.y2 === y))
+          ) {
+            classes.push('is-hint')
+          }
           if (popping.has(key)) classes.push('is-popping')
           else if (spawning.has(key)) classes.push('is-spawned')
           else if (fall) classes.push('is-falling')

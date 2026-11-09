@@ -1,6 +1,8 @@
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { config } from './config.js'
 import { errorHandler } from './lib/errors.js'
 import { authRouter } from './routes/auth.js'
@@ -11,6 +13,7 @@ import { metaRouter } from './routes/meta.js'
 import { recordsRouter } from './routes/records.js'
 import { hubRouter } from './routes/hub.js'
 import { payRouter } from './routes/pay.js'
+import { communityRouter } from './routes/community.js'
 
 export const app = express()
 
@@ -28,6 +31,14 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, data: { name: 'happy-match-api', status: 'up' } })
 })
 
+app.use(
+  '/api/uploads',
+  express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads'), {
+    index: false,
+    fallthrough: true,
+    maxAge: '7d',
+  }),
+)
 app.use('/api/auth', authRouter)
 app.use('/api', meRouter)
 app.use('/api/levels', levelsRouter)
@@ -36,6 +47,7 @@ app.use('/api/records', recordsRouter)
 app.use('/api/pay', payRouter)
 app.use('/api', metaRouter)
 app.use('/api', hubRouter)
+app.use('/api/community', communityRouter)
 
 app.use((req, res) => {
   res.status(404).json({

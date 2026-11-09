@@ -1,4 +1,5 @@
-import { BAG, CHECK_IN_COINS, DAILY_TASKS, EVENTS, RECHARGE, SHOP, STAMINA_MAX, STAMINA_REGEN_MS, STREAK_BONUS, STREAK_GOAL, WIN_COINS } from '../game/economy.js'
+import { BAG, CHECK_IN_COINS, CHECK_IN_WHEEL, DAILY_REWARD, DAILY_TASKS, EVENTS, pickWheelPrize, publicPrize, RECHARGE, SHOP, STAMINA_MAX, STAMINA_REGEN_MS, STREAK_GIFT, STREAK_GOAL, WIN_COINS } from '../game/economy.js'
+import { localDayKey } from '../game/levels.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import crypto from 'crypto'
@@ -58,6 +59,7 @@ export async function loadWallet(userId) {
   const today = dayKey(new Date())
   const activity =
     (checkedIn ? 0 : 1) +
+    (claimed.includes(`daily-win-${localDayKey()}`) ? 0 : 1) +
     liveEvents().filter((event) => !claimed.includes(event.id)).length +
     DAILY_TASKS.filter((task) => progress[task.id] && !claimed.includes(`task-${task.id}-${today}`)).length
   return {
@@ -134,6 +136,7 @@ export async function changeBag(userId, delta) {
 }
 
 function applyReward(data, reward, user) {
+  if (!reward) return
   if (reward.coins) data.coins = { increment: reward.coins }
   if (reward.diamonds) data.diamonds = { increment: reward.diamonds }
   if (reward.stamina) data.stamina = { increment: reward.stamina }
@@ -144,6 +147,39 @@ function applyReward(data, reward, user) {
     }
     data.tools = bag
   }
+}
+
+function mergeRewards(...parts) {
+  const reward = {}
+  for (const part of parts) {
+    if (!part) continue
+    if (part.coins) reward.coins = (reward.coins ?? 0) + part.coins
+    if (part.diamonds) reward.diamonds = (reward.diamonds ?? 0) + part.diamonds
+    if (part.stamina) reward.stamina = (reward.stamina ?? 0) + part.stamina
+    if (part.tools) {
+      reward.tools = reward.tools ?? {}
+      for (const [key, count] of Object.entries(part.tools)) {
+        if (!count) continue
+        reward.tools[key] = (reward.tools[key] ?? 0) + Number(count)
+      }
+    }
+  }
+  return reward
+}
+
+function todayPrizeFrom(claimed, today) {
+  const prefix = `spin-${today}:`
+  const key = asList(claimed).find((item) => String(item).startsWith(prefix))
+  if (!key) return null
+  return publicPrize(CHECK_IN_WHEEL.find((item) => item.id === key.slice(prefix.length)))
+}
+
+function liveStreak(user, now = new Date()) {
+  const last = user?.lastCheckIn
+  if (!last) return 0
+  const key = dayKey(last)
+  if (key !== dayKey(now) && key !== yesterdayKey(now)) return 0
+  return user.checkStreak ?? 0
 }
 
 export function listShop(claimedOffers) {
@@ -273,9 +309,16 @@ export async function getActivity(userId) {
   return {
     checkedIn: wallet.checkedIn,
     checkInCoins: wallet.checkInCoins,
-    streak: wallet.streak,
+    streak: liveStreak(user),
     streakGoal: STREAK_GOAL,
-    streakBonus: STREAK_BONUS,
+    streakGift: STREAK_GIFT,
+    wheel: CHECK_IN_WHEEL.map((item) => publicPrize(item)),
+    todayPrize: todayPrizeFrom(claimed, today),
+    daily: {
+      tried: claimed.includes(`daily-try-${localDayKey()}`),
+      won: claimed.includes(`daily-win-${localDayKey()}`),
+      reward: DAILY_REWARD,
+    },
     events: liveEvents()
       .sort((a, b) => new Date(b.start) - new Date(a.start))
       .map((event) => ({
@@ -298,20 +341,27 @@ export async function checkIn(userId) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   const now = new Date()
   if (user.lastCheckIn && dayKey(user.lastCheckIn) === dayKey(now)) {
-    throw new AppError(409, 'ALREADY_CLAIMED', '今天已经签过到了')
+    throw new AppError(409, 'ALREADY_CLAIMED', '今天已经转过转盘了')
   }
   const streak = user.lastCheckIn && dayKey(user.lastCheckIn) === yesterdayKey(now) ? (user.checkStreak ?? 0) + 1 : 1
-  const bonus = streak % STREAK_GOAL === 0 ? STREAK_BONUS : 0
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      coins: { increment: CHECK_IN_COINS + bonus },
-      lastCheckIn: now,
-      checkStreak: streak,
-    },
-  })
+  const prize = pickWheelPrize()
+  const streakGift = streak % STREAK_GOAL === 0 ? STREAK_GIFT : null
+  const claimed = asList(user.claimedOffers).filter((item) => !String(item).startsWith('spin-'))
+  claimed.push(`spin-${dayKey(now)}:${prize.id}`)
+  const data = {
+    lastCheckIn: now,
+    checkStreak: streak,
+    claimedOffers: claimed,
+  }
+  applyReward(data, mergeRewards(prize.reward, streakGift), user)
+  await prisma.user.update({ where: { id: userId }, data })
   const wallet = await loadWallet(userId)
-  return { ...wallet, bonus }
+  return {
+    ...wallet,
+    prize: publicPrize(prize),
+    streakGift,
+    streak,
+  }
 }
 
 export async function claimEvent(userId, eventId) {
