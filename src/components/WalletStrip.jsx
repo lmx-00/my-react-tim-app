@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { getWallet } from '../api/game.js'
 
 function formatLeft(ms) {
@@ -51,11 +51,18 @@ export function WalletStrip() {
   const staminaLabel = wallet
     ? `体力 ${wallet.stamina}/${wallet.staminaMax}，每 30 分钟恢复 1 点${left == null ? '，已满' : `，下次 ${formatLeft(left)}`}`
     : '体力'
+  const inPlay = location.pathname.startsWith('/play/')
+  const Wrap = inPlay ? 'div' : Link
 
   return (
     <div className="wallet-strip">
       <div className="wallet-pills">
-        <div className="pill pill-heart" aria-label={staminaLabel} title="每 30 分钟恢复 1 点，最多 5 点">
+        <Wrap
+          className="pill pill-heart"
+          aria-label={staminaLabel}
+          title="每 30 分钟恢复 1 点，最多 5 点"
+          {...(inPlay ? {} : { to: '/shop#supply' })}
+        >
           <svg className="pill-icon" viewBox="0 0 32 32" aria-hidden="true">
             <path fill="#ff4d6d" d="M16 27s-9.5-6.2-12.4-11.2C1.6 12.4 3 8 7.2 7.2 10 6.6 12.4 8 16 11.4 19.6 8 22 6.6 24.8 7.2 29 8 30.4 12.4 28.4 15.8 25.5 20.8 16 27 16 27z" />
           </svg>
@@ -63,21 +70,21 @@ export function WalletStrip() {
             <strong>{wallet ? wallet.stamina : '—'}</strong>
             <small>{left == null ? '已满' : formatLeft(left)}</small>
           </span>
-        </div>
-        <div className="pill pill-coin" aria-label={wallet ? `金币 ${wallet.coins}` : '金币'}>
+        </Wrap>
+        <Wrap className="pill pill-coin" aria-label={wallet ? `金币 ${wallet.coins}` : '金币'} {...(inPlay ? {} : { to: '/shop#tools' })}>
           <svg className="pill-icon" viewBox="0 0 32 32" aria-hidden="true">
             <circle cx="16" cy="16" r="12" fill="#ffb703" />
             <circle cx="16" cy="16" r="8" fill="none" stroke="#fff6d8" strokeWidth="2" />
           </svg>
           <strong>{wallet?.coins ?? '—'}</strong>
-        </div>
-        <div className="pill pill-gem" aria-label={wallet ? `钻石 ${wallet.diamonds}` : '钻石'}>
+        </Wrap>
+        <Wrap className="pill pill-gem" aria-label={wallet ? `钻石 ${wallet.diamonds}` : '钻石'} {...(inPlay ? {} : { to: '/shop#packs' })}>
           <svg className="pill-icon" viewBox="0 0 32 32" aria-hidden="true">
             <path fill="#67d4ff" d="M8 8h16l4 6-12 14L4 14z" />
             <path fill="#e8f9ff" d="M12 8h8l2 6H10z" />
           </svg>
           <strong>{wallet?.diamonds ?? '—'}</strong>
-        </div>
+        </Wrap>
       </div>
     </div>
   )

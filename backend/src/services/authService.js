@@ -325,8 +325,20 @@ export async function loginPhoneCode({ phone, code }) {
   return createPlayer({ username: `p${phone}`, phone, isGuest: false })
 }
 
-export async function loginGuest() {
-  return createNamedPlayer('g', { isGuest: true })
+function guestResumeToken(userId) {
+  return crypto.createHmac('sha256', config.jwtAccessSecret).update(`guest:${userId}`).digest('hex')
+}
+
+export async function loginGuest({ id, resume } = {}) {
+  if (id && resume) {
+    const user = await prisma.user.findUnique({ where: { id } })
+    if (user && resume === guestResumeToken(user.id)) {
+      await clearLoginLock(user.id)
+      return { user, guest: { id: user.id, resume } }
+    }
+  }
+  const user = await createNamedPlayer('g', { isGuest: true })
+  return { user, guest: { id: user.id, resume: guestResumeToken(user.id) } }
 }
 
 async function resolveOpenId(body) {

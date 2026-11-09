@@ -7,6 +7,7 @@ import {
   createBoard,
 } from '../game/engine.js'
 import {
+  CHAPTER_SIZE,
   MAX_LEVEL_ID,
   buildGoalProgress,
   emptyGoalProgress,
@@ -233,8 +234,10 @@ async function updateProgressOnWin(userId, level, session) {
   const prevStars = Number(starsMap[key] ?? 0)
   const coins = coinsForStars(session.stars)
   const tools = {}
-  if (session.stars >= 3 && prevStars < 3) tools.hammer = 1
-  else if (session.stars >= 2 && prevStars < 2) tools.shuffle = 1
+  // 普通关只给金币。整章最后一关第一次拿到星级，才送一把道具，避免每关都进背包。
+  const chapterBoss = level.id % CHAPTER_SIZE === 0
+  if (chapterBoss && session.stars >= 3 && prevStars < 3) tools.hammer = 1
+  else if (chapterBoss && session.stars >= 2 && prevStars < 2) tools.shuffle = 1
   starsMap[key] = Math.max(prevStars, session.stars)
   const prevBest = bestMap[key] ?? {}
   bestMap[key] = {

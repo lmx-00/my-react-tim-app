@@ -132,7 +132,7 @@ export function LevelsPage() {
         <div>
           <p className="eyebrow">{levels.length ? `第 ${seenChapter + 1} 章` : '关卡'}</p>
           <h1>{levels.length ? chapterTitle(seenChapter) : '关卡'}</h1>
-          {levels.length ? <p className="muted">已通关 {cleared}/{levels.length}</p> : null}
+          {levels.length ? <p className="muted">已通关 {cleared}/{levels.length}。每章最后一关首次三星送锤子，两星送洗牌。</p> : null}
         </div>
       </div>
       {levels.length ? (

@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { getTheme } from '../api/game.js'
-import { useAuth } from '../auth/useAuth.js'
 import { playerAudio, setMusicEnabled, setSfxEnabled } from '../game/sound.js'
 
 export function SettingsPage() {
-  const { logout } = useAuth()
-  const navigate = useNavigate()
   const [site, setSite] = useState(true)
   const [music, setMusic] = useState(() => playerAudio().music)
   const [sfx, setSfx] = useState(() => playerAudio().sfx)
@@ -16,11 +13,6 @@ export function SettingsPage() {
       .then((data) => setSite(data.sound !== false))
       .catch(() => {})
   }, [])
-
-  async function handleLogout() {
-    await logout()
-    navigate('/login', { replace: true })
-  }
 
   return (
     <section className="stack">
@@ -65,9 +57,6 @@ export function SettingsPage() {
           <span>隐私政策</span>
           <span aria-hidden="true">›</span>
         </Link>
-        <button type="button" className="account-link account-logout" onClick={handleLogout}>
-          <span>退出登录</span>
-        </button>
       </div>
     </section>
   )

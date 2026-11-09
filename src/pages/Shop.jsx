@@ -37,8 +37,9 @@ export function ShopPage() {
   }, [])
 
   useEffect(() => {
-    if (location.hash !== '#packs') return
-    document.getElementById('packs')?.scrollIntoView({ block: 'start' })
+    const id = location.hash.replace('#', '')
+    if (!id) return
+    document.getElementById(id)?.scrollIntoView({ block: 'start' })
   }, [location.hash, items.length])
 
   async function buy(id) {
@@ -82,39 +83,43 @@ export function ShopPage() {
         </p>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
-      <h2>钻石充值</h2>
-      <p className="muted">1 元 = 10 颗钻石。点进去会拉起收银台。</p>
-      <div className="shop-list">
-        {recharge.map((item) => (
-          <article key={item.id} className="shop-row">
-            <div>
-              <strong>{item.name}</strong>
-              <p className="muted">{yuan(item.amountFen)}</p>
-            </div>
-            <button type="button" className="btn btn-sm" onClick={() => setCashier(item)}>
-              充值
-            </button>
-          </article>
-        ))}
-      </div>
       <h2 id="packs">礼包</h2>
       <div className="shop-list">
         {packs.map((item) => (
           <ShopRow key={item.id} item={item} onBuy={buy} />
         ))}
       </div>
-      <h2>道具</h2>
+      <h2 id="tools">道具</h2>
       <div className="shop-list">
         {tools.map((item) => (
           <ShopRow key={item.id} item={item} onBuy={buy} />
         ))}
       </div>
-      <h2>补给和钻石</h2>
+      <h2 id="supply">补给和钻石</h2>
       <div className="shop-list">
         {rest.map((item) => (
           <ShopRow key={item.id} item={item} onBuy={buy} />
         ))}
       </div>
+      {channels.length ? (
+        <>
+          <h2>钻石充值</h2>
+          <p className="muted">1 元 = 10 颗钻石。点进去会拉起收银台。</p>
+          <div className="shop-list">
+            {recharge.map((item) => (
+              <article key={item.id} className="shop-row">
+                <div>
+                  <strong>{item.name}</strong>
+                  <p className="muted">{yuan(item.amountFen)}</p>
+                </div>
+                <button type="button" className="btn btn-sm" onClick={() => setCashier(item)}>
+                  充值
+                </button>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
       {cashier ? (
         <div className="cashier-mask" role="presentation" onClick={() => (paying ? null : setCashier(null))}>
           <section className="cashier" role="dialog" aria-label="收银台" onClick={(event) => event.stopPropagation()}>

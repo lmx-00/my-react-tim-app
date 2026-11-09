@@ -31,6 +31,30 @@ export const EVENTS = [
     days: 6,
     reward: { tools: { plus: 1 } },
   },
+  {
+    id: 'winter-week',
+    name: '暖冬周',
+    text: '领取 80 金币和 1 次交换。',
+    start: '2026-11-05T00:00:00+08:00',
+    days: 7,
+    reward: { coins: 80, tools: { swap: 1 } },
+  },
+  {
+    id: 'starlight-week',
+    name: '星光周',
+    text: '领取 60 金币和 1 次加五步。',
+    start: '2026-11-05T00:00:00+08:00',
+    days: 8,
+    reward: { coins: 60, tools: { plus: 1 } },
+  },
+  {
+    id: 'weekend-pack',
+    name: '周末补给',
+    text: '领取 100 金币。',
+    start: '2026-11-07T00:00:00+08:00',
+    days: 4,
+    reward: { coins: 100 },
+  },
 ]
 
 export const DAILY_TASKS = [

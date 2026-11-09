@@ -41,6 +41,11 @@ export const phoneSendSchema = z.object({
   phone: phoneSchema,
 })
 
+export const guestSchema = z.object({
+  id: z.string().uuid().optional(),
+  resume: z.string().min(16).max(128).optional(),
+})
+
 export const wechatAuthSchema = z.object({
   code: z.string().min(1).max(128).optional(),
   openid: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/, '微信身份不正确').optional(),

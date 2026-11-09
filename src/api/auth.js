@@ -45,8 +45,26 @@ export function loginPhoneCodeRequest(phone, code) {
   return api('/auth/login/phone-code', { method: 'POST', body: { phone, code } })
 }
 
+const GUEST_KEY = 'hm-guest'
+
+function storedGuest() {
+  try {
+    const value = JSON.parse(localStorage.getItem(GUEST_KEY) || 'null')
+    if (value?.id && value?.resume) return value
+  } catch {
+    // 读不到就开新游客
+  }
+  return null
+}
+
 export function guestLoginRequest() {
-  return api('/auth/guest', { method: 'POST' })
+  const guest = storedGuest()
+  return api('/auth/guest', { method: 'POST', body: guest ?? {} }).then((data) => {
+    if (data.guest?.id && data.guest?.resume) {
+      localStorage.setItem(GUEST_KEY, JSON.stringify(data.guest))
+    }
+    return data
+  })
 }
 
 export function wechatLoginRequest(body) {

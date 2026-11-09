@@ -9,6 +9,7 @@ function rewardText(reward) {
   if (reward?.tools?.hammer) parts.push(`锤子 ×${reward.tools.hammer}`)
   if (reward?.tools?.shuffle) parts.push(`洗牌 ×${reward.tools.shuffle}`)
   if (reward?.tools?.swap) parts.push(`交换 ×${reward.tools.swap}`)
+  if (reward?.tools?.plus) parts.push(`加五步 ×${reward.tools.plus}`)
   return parts.join('、') || '无附件'
 }
 

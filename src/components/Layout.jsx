@@ -75,7 +75,7 @@ export function Layout({ children }) {
       {inGame || inLoad ? null : (
       <div className="sticky-top">
       <header className="topbar">
-        <Link to={isLoggedIn ? '/' : '/login'} className="brand">
+        <Link to={isLoggedIn ? '/levels' : '/login'} className="brand">
           开心消消乐
         </Link>
         <nav className="nav">

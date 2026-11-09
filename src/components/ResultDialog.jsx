@@ -10,7 +10,7 @@ const STATUS_TEXT = {
   expired: '对局已过期',
 }
 
-const TOOL_NAME = { hammer: '锤子', shuffle: '洗牌', swap: '交换' }
+const TOOL_NAME = { hammer: '锤子', shuffle: '洗牌', swap: '交换', plus: '加五步' }
 
 function toolText(tools) {
   return Object.entries(tools ?? {})
@@ -75,7 +75,12 @@ export function ResultDialog({ session }) {
           得分 {session.score}，剩余步数 {session.movesLeft}
         </p>
         {session.rewardCoins ? <p>获得 {session.rewardCoins} 金币</p> : null}
-        {tools ? <p>获得 {tools}</p> : null}
+        {tools ? (
+          <p>
+            获得 {tools}
+            {session.level.id % 20 === 0 ? <span className="muted">（本章最后一关首次星级奖励）</span> : null}
+          </p>
+        ) : null}
         {shareNote ? <p className="muted">{shareNote}</p> : null}
         {blocked ? <p className="form-error">{blocked}</p> : null}
         <div className="actions">

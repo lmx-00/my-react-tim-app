@@ -50,6 +50,9 @@ export function LevelLoadPage() {
       <p className="eyebrow">第 {levelId} 关</p>
       <h1>{level?.name ?? '关卡准备中'}</h1>
       {level ? <p className="level-load-goal">目标：{goalText(level)}</p> : <p className="muted">正在读取关卡…</p>}
+      {Number(levelId) % 20 === 0 ? (
+        <p className="muted">本章最后一关。第一次拿到三星送锤子，两星送洗牌。</p>
+      ) : null}
       {level?.bestScore > 0 ? <p>最高分 {level.bestScore}</p> : null}
       {level?.status === 'cleared' ? <Stars value={level.stars} /> : null}
       <div className="level-load-track" aria-hidden="true">

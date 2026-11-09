@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, ok } from '../lib/errors.js'
 import { refreshCookieOptions } from '../lib/jwt.js'
-import { loginSchema, passwordChangeSchema, phoneAuthSchema, phoneCodeSchema, phoneLoginSchema, phoneSendSchema, registerSchema, wechatAuthSchema } from '../lib/schemas.js'
+import { guestSchema, loginSchema, passwordChangeSchema, phoneAuthSchema, phoneCodeSchema, phoneLoginSchema, phoneSendSchema, registerSchema, wechatAuthSchema } from '../lib/schemas.js'
 import { parseWith } from '../lib/validate.js'
 import { authRequired } from '../middleware/auth.js'
 import {
@@ -81,8 +81,9 @@ authRouter.post(
 authRouter.post(
   '/guest',
   asyncHandler(async (req, res) => {
-    const user = await loginGuest()
-    ok(res, await issueAuth(res, user), 201)
+    const body = parseWith(guestSchema, req.body ?? {})
+    const { user, guest } = await loginGuest(body)
+    ok(res, { ...(await issueAuth(res, user)), guest })
   }),
 )
 

@@ -175,6 +175,7 @@ export function LoginPage() {
           微信一键登录
         </button>
       </div>
+      <p className="muted">同一台设备再点游客进入，会回到原来的游客号。</p>
       <p className="auth-foot">
         还没有账号？<Link to="/register">去注册</Link>
       </p>

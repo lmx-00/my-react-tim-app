@@ -511,7 +511,13 @@ p {
   padding: 4px 12px 4px 6px;
   border-radius: 999px;
   background: #fff;
+  color: inherit;
+  text-decoration: none;
   box-shadow: inset 0 0 0 2px #ffe0ee, 0 3px 0 #ffd0e4;
+}
+
+a.pill {
+  cursor: pointer;
 }
 
 .pill-icon {
