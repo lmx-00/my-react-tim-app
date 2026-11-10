@@ -189,7 +189,7 @@ function PostCard({ item, onLike, onDelete, onCommented }) {
         </div>
       ) : null}
       {item.levelName ? (
-        scored ? (
+        scored && !item.imageUrl ? (
           <Link className={`${chipClass} is-score`} to={`/load/${item.levelId}`}>
             <span>{item.levelName}</span>
             <strong>

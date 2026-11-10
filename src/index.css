@@ -3202,8 +3202,9 @@ html[data-theme='forest'] .vine-leaf {
 }
 
 .post-photo img {
-  max-height: 280px;
-  object-fit: cover;
+  max-height: min(58vh, 520px);
+  object-fit: contain;
+  background: linear-gradient(180deg, #fff8fc, #ffe8f3);
 }
 
 .post-photo-big {

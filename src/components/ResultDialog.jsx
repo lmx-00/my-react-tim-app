@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { NO_STAMINA_TEXT, createPost, staminaBlocked } from '../api/game.js'
+import { NO_STAMINA_TEXT, createPost, staminaBlocked, uploadPhoto } from '../api/game.js'
+import { useAuth } from '../auth/useAuth.js'
+import { makeShareCard } from '../game/shareCard.js'
 import { Stars } from './Stars.jsx'
 
 const STATUS_TEXT = {
@@ -21,6 +23,7 @@ function toolText(tools) {
 
 export function ResultDialog({ session }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [shareNote, setShareNote] = useState('')
   const [blocked, setBlocked] = useState('')
   const [posted, setPosted] = useState(false)
@@ -48,7 +51,17 @@ export function ResultDialog({ session }) {
     setPosting(true)
     setShareNote('')
     try {
-      await createPost({ sessionId: session.sessionId })
+      const payload = { sessionId: session.sessionId }
+      try {
+        const blob = await makeShareCard(
+          session,
+          user?.nickname || (user?.isGuest ? '' : user?.username) || '',
+        )
+        payload.imageUrl = (await uploadPhoto(blob)).url
+      } catch {
+        // 图没成也把文字发上去
+      }
+      await createPost(payload)
       setPosted(true)
       setShareNote('已发到社区')
     } catch (err) {
