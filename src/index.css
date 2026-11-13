@@ -1211,48 +1211,51 @@ a.pill {
 
 .vine-wrap {
   position: relative;
+  display: grid;
+}
+
+.vine-wrap > .vine-scroll {
+  grid-area: 1 / 1;
 }
 
 .back-to-current {
-  position: absolute;
-  right: 10px;
-  bottom: 18px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.38);
-  color: #7a4a62;
+  grid-area: 1 / 1;
+  place-self: end;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 10px 12px 0;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #ff7eb3;
+  color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
-  backdrop-filter: blur(6px);
-  box-shadow: none;
+  box-shadow: 0 5px 0 rgba(226, 75, 147, 0.28);
   cursor: pointer;
 }
 
 .back-to-current i {
-  position: absolute;
-  left: 50%;
   width: 0;
   height: 0;
-  border-right: 7px solid transparent;
-  border-left: 7px solid transparent;
-  transform: translateX(-50%);
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
 }
 
 .back-to-current.is-up i {
-  top: -8px;
-  border-bottom: 7px solid rgba(255, 126, 179, 0.75);
+  border-bottom: 6px solid #fff;
 }
 
 .back-to-current.is-down i {
-  bottom: -8px;
-  border-top: 7px solid rgba(255, 126, 179, 0.75);
+  border-top: 6px solid #fff;
+}
+
+.back-to-current.is-here i {
+  display: none;
 }
 
 .vine-scroll {
@@ -1263,23 +1266,124 @@ a.pill {
   border-radius: 28px;
   background:
     radial-gradient(ellipse 90% 220px at 50% 0, rgba(255, 255, 255, 0.7), transparent 70%),
-    linear-gradient(180deg, #b8e9ff 0 72px, #ffe4f4 160px, #fff0c8 46%, #ffd6ee 100%);
+    linear-gradient(180deg, #b8e9ff 0 72px, #c8efc0 160px, #9adf68 100%);
+  transition: background 420ms ease;
 }
 
 .vine {
   position: relative;
   height: calc(var(--map-pad, 0px) + var(--steps) * var(--step));
-  background-image:
-    radial-gradient(ellipse 54% 80px at 8% 30px, rgba(255, 194, 228, 0.55) 0 72%, transparent 73%),
-    radial-gradient(ellipse 58% 88px at 94% 90px, rgba(255, 217, 168, 0.5) 0 72%, transparent 73%),
-    radial-gradient(ellipse 62% 76px at 50% 180px, rgba(255, 184, 216, 0.45) 0 70%, transparent 71%);
   background-size: 100% 360px;
   background-repeat: repeat-y;
+}
+
+.map-atmosphere {
+  position: sticky;
+  top: 0;
+  z-index: 0;
+  height: 108px;
+  margin-bottom: -108px;
+  pointer-events: none;
+}
+
+.map-atmosphere::before,
+.map-atmosphere::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.map-atmosphere.is-forest::before,
+.map-atmosphere.is-valley::before,
+.map-atmosphere.is-garden::before,
+.map-atmosphere.is-orchard::before,
+.map-atmosphere.is-desert::before,
+.map-atmosphere.is-sea::before,
+.map-atmosphere.is-rainbow::before {
+  left: 18px;
+  top: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fff 0 28%, #ffe566 48%, #ffb703 100%);
+  box-shadow: 0 0 0 10px rgba(255, 229, 102, 0.25);
+}
+
+.map-atmosphere.is-snow::before {
+  left: 16px;
+  top: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fff, #e8f4ff 70%);
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.35);
+}
+
+.map-atmosphere.is-moon::before {
+  right: 28px;
+  top: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 62% 38%, transparent 0 16px, #fff6c8 17px),
+    radial-gradient(circle at 40% 40%, #fff 0 70%, #ffe9a0);
+}
+
+.map-atmosphere.is-stars::before {
+  left: 28%;
+  top: 30px;
+  width: 56px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fff, transparent);
+  transform: rotate(-32deg);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+.map-atmosphere.is-stars::after,
+.map-atmosphere.is-moon::after {
+  inset: 10px 12px auto 12px;
+  height: 86px;
+  background-image:
+    radial-gradient(circle at 8% 22%, #fff 0 1.2px, transparent 2px),
+    radial-gradient(circle at 18% 48%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 28% 14%, #ffe9a8 0 1.4px, transparent 2px),
+    radial-gradient(circle at 38% 36%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 48% 8%, #fff 0 1.2px, transparent 2px),
+    radial-gradient(circle at 58% 42%, #d4c4ff 0 1px, transparent 2px),
+    radial-gradient(circle at 68% 18%, #fff 0 1.5px, transparent 2.2px),
+    radial-gradient(circle at 78% 52%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 12%, #ffe9a8 0 1.2px, transparent 2px),
+    radial-gradient(circle at 94% 38%, #fff 0 1px, transparent 2px);
+}
+
+.map-atmosphere.is-clouds::before,
+.map-atmosphere.is-castle::before {
+  left: 20px;
+  top: 28px;
+  width: 70px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 28px -10px 0 6px rgba(255, 255, 255, 0.75);
+}
+
+.map-atmosphere.is-lava::before,
+.map-atmosphere.is-dragon::before {
+  left: 24px;
+  top: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe08a, #ff5a1f 60%, transparent 70%);
+  box-shadow: 0 0 24px 8px rgba(255, 90, 31, 0.45);
 }
 
 .vine-svg {
   position: absolute;
   left: 0;
+  z-index: 1;
   width: 100%;
   pointer-events: none;
 }
@@ -1347,7 +1451,7 @@ a.pill {
 .map-prop,
 .map-grove {
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
   transform: translate(-50%, -50%);
 }
@@ -1358,9 +1462,13 @@ a.pill {
   overflow: visible;
 }
 
-.map-prop.is-lollipop {
+.map-prop.is-lollipop,
+.map-prop.is-pine,
+.map-prop.is-palm,
+.map-prop.is-bamboo,
+.map-prop.is-turret {
   width: 36px;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .map-prop.is-cloud {
@@ -1368,16 +1476,350 @@ a.pill {
   opacity: 0.7;
 }
 
+.map-prop.is-flake {
+  width: 26px;
+  opacity: 0.8;
+}
+
+.map-prop.is-star {
+  width: 14px;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 4px rgba(255, 246, 200, 0.8));
+}
+
+.map-prop.is-cactus,
+.map-prop.is-ember,
+.map-prop.is-flag {
+  width: 24px;
+  opacity: 0.9;
+}
+
+.map-prop.is-mushroom,
+.map-prop.is-flower,
+.map-prop.is-flower2,
+.map-prop.is-peach,
+.map-prop.is-apple,
+.map-prop.is-reed {
+  width: 30px;
+  opacity: 0.95;
+}
+
+.map-prop.is-bush,
+.map-prop.is-hedge {
+  width: 44px;
+  opacity: 0.92;
+}
+
+.map-prop.is-lily {
+  width: 48px;
+  opacity: 0.95;
+}
+
+.map-prop.is-shell,
+.map-prop.is-peak {
+  width: 28px;
+  opacity: 0.92;
+}
+
+.vine-wrap .vine-scroll[data-land='forest'] {
+  background:
+    linear-gradient(90deg, rgba(28, 92, 38, 0.3), transparent 20%, transparent 80%, rgba(28, 92, 38, 0.3)),
+    radial-gradient(ellipse 90% 160px at 50% 0, rgba(255, 255, 255, 0.5), transparent 70%),
+    linear-gradient(180deg, #8fd8ff 0%, #d4f0a8 46%, #68b84c 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='valley'] {
+  background:
+    linear-gradient(90deg, rgba(62, 186, 214, 0.42), transparent 26%),
+    radial-gradient(ellipse 90% 160px at 50% 0, rgba(255, 255, 255, 0.45), transparent 70%),
+    linear-gradient(180deg, #c8f4ff 0%, #b6eee4 50%, #74c8b8 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='garden'] {
+  background:
+    linear-gradient(90deg, rgba(255, 150, 190, 0.22), transparent 22%, transparent 78%, rgba(170, 214, 110, 0.2)),
+    linear-gradient(180deg, #ffd6ec 0%, #fff2f7 42%, #e2f4c2 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='orchard'] {
+  background:
+    linear-gradient(90deg, rgba(210, 120, 40, 0.16), transparent 20%, transparent 80%, rgba(210, 120, 40, 0.16)),
+    linear-gradient(180deg, #ffe7b8 0%, #ffd9a0 48%, #e8a85a 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] {
+  background:
+    radial-gradient(ellipse 90% 160px at 50% 0, rgba(255, 255, 255, 0.7), transparent 70%),
+    linear-gradient(180deg, #d4ecff 0%, #f5f9ff 52%, #e8f2ff 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='desert'] {
+  background:
+    linear-gradient(90deg, rgba(196, 140, 40, 0.18), transparent 22%, transparent 78%, rgba(196, 140, 40, 0.18)),
+    linear-gradient(180deg, #ffe59a 0%, #ffe3b4 42%, #e0b45a 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='sea'] {
+  background:
+    linear-gradient(180deg, #6ec4ff 0%, #c8ecff 38%, #ffe9b8 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] {
+  background: linear-gradient(180deg, #070616 0%, #14102e 62%, #1b1542 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='castle'] {
+  background:
+    linear-gradient(90deg, rgba(90, 60, 140, 0.18), transparent 20%, transparent 80%, rgba(90, 60, 140, 0.18)),
+    linear-gradient(180deg, #e8dcff 0%, #cbb6f0 50%, #8a72c0 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='maze'] {
+  background:
+    linear-gradient(90deg, rgba(30, 90, 40, 0.28), transparent 18%, transparent 82%, rgba(30, 90, 40, 0.28)),
+    linear-gradient(180deg, #d4f0c6 0%, #86c47c 50%, #3c8248 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='clouds'] {
+  background: linear-gradient(180deg, #eef4ff 0%, #f7f9ff 50%, #dce6ff 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='lava'] {
+  background: linear-gradient(180deg, #2a0c10 0%, #7a1d18 58%, #c23b22 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='bamboo'] {
+  background:
+    linear-gradient(90deg, rgba(40, 110, 30, 0.2), transparent 18%, transparent 82%, rgba(40, 110, 30, 0.2)),
+    linear-gradient(180deg, #e3f6d0 0%, #b6e08a 50%, #5aaa3a 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='moon'] {
+  background: linear-gradient(180deg, #0d1b3a 0%, #163058 70%, #1e3f6e 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='rainbow'] {
+  background: linear-gradient(180deg, #ffd0ea 0%, #fff0b8 36%, #c5f0c0 64%, #b8e0ff 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='dragon'] {
+  background: linear-gradient(180deg, #3a2210 0%, #7a4a18 58%, #d4a017 100%);
+}
+
+.vine-wrap .vine-scroll[data-land='forest'] .vine {
+  background-image:
+    radial-gradient(circle 1.4px at 8% 22px, rgba(255, 255, 255, 0.7), transparent 2px),
+    radial-gradient(circle 1px at 18% 80px, rgba(255, 255, 255, 0.55), transparent 2px),
+    radial-gradient(circle 1.6px at 86% 48px, rgba(255, 255, 255, 0.65), transparent 2.2px),
+    radial-gradient(circle 2px at 12% 160px, rgba(47, 122, 50, 0.28), transparent 3px),
+    radial-gradient(circle 1.2px at 90% 140px, rgba(47, 122, 50, 0.3), transparent 2px),
+    radial-gradient(circle 1px at 22% 240px, rgba(255, 255, 255, 0.5), transparent 2px),
+    radial-gradient(circle 1.4px at 78% 220px, rgba(255, 255, 255, 0.45), transparent 2px),
+    radial-gradient(circle 2px at 10% 310px, rgba(47, 122, 50, 0.25), transparent 3px),
+    radial-gradient(circle 1px at 84% 300px, rgba(255, 255, 255, 0.5), transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='valley'] .vine {
+  background-image:
+    radial-gradient(circle 1.6px at 10% 30px, rgba(255, 255, 255, 0.8), transparent 2.2px),
+    radial-gradient(circle 1px at 16% 90px, rgba(255, 255, 255, 0.7), transparent 2px),
+    radial-gradient(circle 1.4px at 12% 170px, rgba(255, 255, 255, 0.75), transparent 2px),
+    radial-gradient(circle 1px at 20% 250px, rgba(255, 255, 255, 0.6), transparent 2px),
+    radial-gradient(circle 1.8px at 8% 320px, rgba(255, 255, 255, 0.8), transparent 2.4px),
+    radial-gradient(circle 1px at 88% 70px, rgba(255, 255, 255, 0.45), transparent 2px),
+    radial-gradient(circle 1.2px at 80% 200px, rgba(255, 255, 255, 0.4), transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='garden'] .vine {
+  background-image:
+    radial-gradient(circle 2px at 10% 36px, #ff8ec4, transparent 3px),
+    radial-gradient(circle 1.6px at 18% 100px, #c084fc, transparent 2.4px),
+    radial-gradient(circle 2px at 88% 60px, #ffd23f, transparent 3px),
+    radial-gradient(circle 1.4px at 12% 180px, #fb7185, transparent 2.2px),
+    radial-gradient(circle 1.8px at 86% 150px, #ff9ecd, transparent 2.6px),
+    radial-gradient(circle 1.6px at 16% 260px, #e879f9, transparent 2.4px),
+    radial-gradient(circle 2px at 90% 240px, #ffe566, transparent 3px),
+    radial-gradient(circle 1.4px at 10% 330px, #ff7eb3, transparent 2.2px),
+    radial-gradient(circle 1.6px at 84% 310px, #c084fc, transparent 2.4px);
+}
+
+.vine-wrap .vine-scroll[data-land='orchard'] .vine {
+  background-image:
+    radial-gradient(circle 2px at 12% 50px, #ff7a4a, transparent 3px),
+    radial-gradient(circle 1.6px at 88% 80px, #e25555, transparent 2.4px),
+    radial-gradient(circle 1.4px at 16% 170px, #ff9a6a, transparent 2.2px),
+    radial-gradient(circle 2px at 84% 200px, #ff7a4a, transparent 3px),
+    radial-gradient(circle 1.6px at 10% 300px, #e25555, transparent 2.4px),
+    radial-gradient(circle 1px at 78% 320px, rgba(255, 255, 255, 0.5), transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] .vine {
+  background-image:
+    radial-gradient(circle 1.6px at 8% 20px, #fff, transparent 2.2px),
+    radial-gradient(circle 1px at 22% 70px, #fff, transparent 2px),
+    radial-gradient(circle 2px at 86% 40px, #fff, transparent 2.6px),
+    radial-gradient(circle 1.2px at 14% 140px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 78% 120px, #fff, transparent 2px),
+    radial-gradient(circle 1.8px at 10% 220px, #fff, transparent 2.4px),
+    radial-gradient(circle 1px at 90% 200px, #fff, transparent 2px),
+    radial-gradient(circle 1.4px at 28% 300px, #fff, transparent 2px),
+    radial-gradient(circle 1.6px at 84% 310px, #fff, transparent 2.2px);
+}
+
+.vine-wrap .vine-scroll[data-land='desert'] .vine {
+  background-image:
+    radial-gradient(circle 1.4px at 14% 40px, rgba(255, 255, 255, 0.45), transparent 2px),
+    radial-gradient(circle 1px at 86% 90px, rgba(180, 120, 30, 0.35), transparent 2px),
+    radial-gradient(circle 1.6px at 10% 180px, rgba(255, 255, 255, 0.35), transparent 2.2px),
+    radial-gradient(circle 1px at 80% 240px, rgba(180, 120, 30, 0.3), transparent 2px),
+    radial-gradient(circle 1.2px at 18% 320px, rgba(255, 255, 255, 0.4), transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='sea'] .vine {
+  background-image:
+    radial-gradient(circle 1.6px at 12% 30px, #fff, transparent 2.2px),
+    radial-gradient(circle 1px at 28% 80px, #fff, transparent 2px),
+    radial-gradient(circle 1.4px at 84% 50px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 16% 160px, #fff, transparent 2px),
+    radial-gradient(circle 1.8px at 88% 190px, #fff, transparent 2.4px),
+    radial-gradient(circle 1.2px at 10% 280px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 76% 320px, #fff, transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] .vine {
+  background-image:
+    radial-gradient(ellipse 100px 28px at 24% 90px, rgba(110, 90, 210, 0.14), transparent 72%),
+    radial-gradient(ellipse 120px 24px at 78% 230px, rgba(255, 150, 210, 0.08), transparent 72%),
+    radial-gradient(circle 1.4px at 8% 18px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 16% 64px, #fff, transparent 2px),
+    radial-gradient(circle 1.8px at 24% 120px, #ffe9a8, transparent 2.4px),
+    radial-gradient(circle 1px at 36% 40px, #fff, transparent 2px),
+    radial-gradient(circle 1.2px at 48% 96px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 58% 28px, #d4c4ff, transparent 2px),
+    radial-gradient(circle 2px at 70% 72px, #fff, transparent 2.6px),
+    radial-gradient(circle 1px at 82% 16px, #fff, transparent 2px),
+    radial-gradient(circle 1.4px at 90% 108px, #ffe9a8, transparent 2px),
+    radial-gradient(circle 1px at 12% 180px, #fff, transparent 2px),
+    radial-gradient(circle 1.6px at 30% 210px, #fff, transparent 2.2px),
+    radial-gradient(circle 1px at 44% 168px, #d4c4ff, transparent 2px),
+    radial-gradient(circle 1.2px at 62% 198px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 76% 150px, #fff, transparent 2px),
+    radial-gradient(circle 1.8px at 88% 188px, #ffe9a8, transparent 2.4px),
+    radial-gradient(circle 1px at 6% 260px, #fff, transparent 2px),
+    radial-gradient(circle 1.2px at 22% 300px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 40% 280px, #d4c4ff, transparent 2px),
+    radial-gradient(circle 1.5px at 54% 320px, #fff, transparent 2.2px),
+    radial-gradient(circle 1px at 68% 270px, #fff, transparent 2px),
+    radial-gradient(circle 1.2px at 84% 310px, #ffe9a8, transparent 2px),
+    radial-gradient(circle 1px at 94% 250px, #fff, transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='moon'] .vine {
+  background-image:
+    radial-gradient(ellipse 90px 26px at 30% 120px, rgba(70, 110, 180, 0.16), transparent 72%),
+    radial-gradient(circle 1px at 14% 36px, #fff, transparent 2px),
+    radial-gradient(circle 1.2px at 40% 80px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 72% 24px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 88% 110px, #d4c4ff, transparent 2px),
+    radial-gradient(circle 1.4px at 22% 200px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 60% 240px, #fff, transparent 2px),
+    radial-gradient(circle 1px at 84% 300px, #fff, transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='castle'] .vine,
+.vine-wrap .vine-scroll[data-land='rainbow'] .vine {
+  background-image:
+    radial-gradient(circle 1.4px at 12% 40px, rgba(255, 255, 255, 0.7), transparent 2px),
+    radial-gradient(circle 1px at 86% 80px, rgba(255, 255, 255, 0.55), transparent 2px),
+    radial-gradient(circle 1.6px at 18% 180px, rgba(255, 255, 255, 0.6), transparent 2.2px),
+    radial-gradient(circle 1px at 80% 240px, rgba(255, 255, 255, 0.5), transparent 2px),
+    radial-gradient(circle 1.2px at 10% 320px, rgba(255, 255, 255, 0.65), transparent 2px);
+}
+
+.vine-wrap .vine-scroll[data-land='clouds'] .vine {
+  background-image:
+    radial-gradient(ellipse 36px 16px at 14% 50px, rgba(255, 255, 255, 0.7), transparent 70%),
+    radial-gradient(ellipse 40px 16px at 86% 140px, rgba(255, 255, 255, 0.65), transparent 70%),
+    radial-gradient(ellipse 32px 14px at 16% 250px, rgba(255, 255, 255, 0.6), transparent 70%),
+    radial-gradient(ellipse 38px 16px at 84% 320px, rgba(255, 255, 255, 0.7), transparent 70%);
+}
+
+.vine-wrap .vine-scroll[data-land='lava'] .vine,
+.vine-wrap .vine-scroll[data-land='dragon'] .vine {
+  background-image:
+    radial-gradient(circle 2px at 14% 40px, #ffd56a, transparent 3px),
+    radial-gradient(circle 1.4px at 86% 90px, #ff7a3d, transparent 2.2px),
+    radial-gradient(circle 1.8px at 12% 180px, #ffd56a, transparent 2.6px),
+    radial-gradient(circle 1px at 80% 230px, #ff7a3d, transparent 2px),
+    radial-gradient(circle 2px at 18% 310px, #ffd56a, transparent 3px);
+}
+
+.vine-wrap .vine-scroll[data-land='maze'] .vine,
+.vine-wrap .vine-scroll[data-land='bamboo'] .vine {
+  background-image:
+    radial-gradient(circle 1.4px at 12% 50px, rgba(255, 255, 255, 0.45), transparent 2px),
+    radial-gradient(circle 1px at 88% 110px, rgba(255, 255, 255, 0.35), transparent 2px),
+    radial-gradient(circle 1.2px at 16% 220px, rgba(255, 255, 255, 0.4), transparent 2px),
+    radial-gradient(circle 1px at 82% 300px, rgba(255, 255, 255, 0.35), transparent 2px);
+}
+
+.map-grove.is-stars svg {
+  filter: drop-shadow(0 0 8px rgba(255, 246, 200, 0.55));
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] .vine-trail-edge {
+  stroke: #c5def5;
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] .vine-trail {
+  stroke: #f7fbff;
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] .vine-shade {
+  stroke: #7eb7e0;
+}
+
+.vine-wrap .vine-scroll[data-land='snow'] .vine-stem {
+  stroke: #b8d8f2;
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] .vine-trail-edge,
+.vine-wrap .vine-scroll[data-land='moon'] .vine-trail-edge {
+  stroke: #5b4a8a;
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] .vine-trail,
+.vine-wrap .vine-scroll[data-land='moon'] .vine-trail {
+  stroke: #efe7ff;
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] .vine-shade,
+.vine-wrap .vine-scroll[data-land='moon'] .vine-shade {
+  stroke: #ff8ec4;
+}
+
+.vine-wrap .vine-scroll[data-land='lava'] .vine-trail,
+.vine-wrap .vine-scroll[data-land='dragon'] .vine-trail {
+  stroke: #ffe6c2;
+}
+
+.vine-wrap .vine-scroll[data-land='stars'] .vine-sign,
+.vine-wrap .vine-scroll[data-land='moon'] .vine-sign,
+.vine-wrap .vine-scroll[data-land='lava'] .vine-sign,
+.vine-wrap .vine-scroll[data-land='dragon'] .vine-sign {
+  background: rgba(255, 255, 255, 0.92);
+}
+
 .map-grove {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 72px;
+  width: 56px;
 }
 
 .map-grove svg {
-  width: 78px;
+  width: 44px;
 }
 
 .vine-sign {
@@ -2357,6 +2799,22 @@ a.pill {
   .den-face {
     width: 58px;
     height: 58px;
+  }
+
+  .vine-scroll {
+    min-height: 240px;
+    max-height: calc(100dvh - 260px);
+  }
+
+  .back-to-current {
+    position: fixed;
+    grid-area: auto;
+    place-self: auto;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 20;
+    height: 44px;
+    margin: 0;
   }
 
   .hud {

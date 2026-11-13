@@ -49,7 +49,7 @@ export function WalletStrip() {
 
   const left = deadline == null ? null : Math.max(0, deadline - now)
   const staminaLabel = wallet
-    ? `体力 ${wallet.stamina}/${wallet.staminaMax}，每 30 分钟恢复 1 点${left == null ? '，已满' : `，下次 ${formatLeft(left)}`}`
+    ? `体力 ${wallet.stamina}/${wallet.staminaMax}，每 5 分钟恢复 1 点${left == null ? '，已满' : `，下次 ${formatLeft(left)}`}`
     : '体力'
   const inPlay = location.pathname.startsWith('/play/')
   const Wrap = inPlay ? 'div' : Link
@@ -60,7 +60,7 @@ export function WalletStrip() {
         <Wrap
           className="pill pill-heart"
           aria-label={staminaLabel}
-          title="每 30 分钟恢复 1 点，最多 5 点"
+          title="每 5 分钟恢复 1 点，最多 5 点"
           {...(inPlay ? {} : { to: '/shop#supply' })}
         >
           <svg className="pill-icon" viewBox="0 0 32 32" aria-hidden="true">
@@ -73,8 +73,14 @@ export function WalletStrip() {
         </Wrap>
         <Wrap className="pill pill-coin" aria-label={wallet ? `金币 ${wallet.coins}` : '金币'} {...(inPlay ? {} : { to: '/shop#tools' })}>
           <svg className="pill-icon" viewBox="0 0 32 32" aria-hidden="true">
-            <circle cx="16" cy="16" r="12" fill="#ffb703" />
-            <circle cx="16" cy="16" r="8" fill="none" stroke="#fff6d8" strokeWidth="2" />
+            <circle cx="16" cy="17.4" r="12" fill="#e09410" />
+            <circle cx="16" cy="16" r="12" fill="#ffc53d" />
+            <circle cx="16" cy="16" r="9" fill="none" stroke="#fff3c2" strokeWidth="1.7" />
+            <path
+              fill="#fff8e4"
+              d="M16 8.6 17.8 14h5.4l-4.4 3.2 1.7 5.2L16 19.4l-4.5 3 1.7-5.2-4.4-3.2h5.4z"
+            />
+            <ellipse cx="12.2" cy="12" rx="4.2" ry="2.4" fill="#fff" opacity="0.5" />
           </svg>
           <strong>{wallet?.coins ?? '—'}</strong>
         </Wrap>

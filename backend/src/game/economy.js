@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 
 export const STAMINA_MAX = 5
-export const STAMINA_REGEN_MS = 30 * 60 * 1000
+export const STAMINA_REGEN_MS = 5 * 60 * 1000
 export const CHECK_IN_COINS = 50
 export const STREAK_GOAL = 7
 export const STREAK_GIFT = {

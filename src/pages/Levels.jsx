@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { NO_STAMINA_TEXT, listLevels, staminaBlocked } from '../api/game.js'
-import { MapGrove, MapProp, MapSky, propKind, propSide } from '../components/MapLand.jsx'
+import { MapAtmosphere, MapGrove, MapProp, landOf, propKind, propSide } from '../components/MapLand.jsx'
 import { goalText } from '../game/tiles.js'
 
 const CHAPTER_SIZE = 20
@@ -44,13 +44,19 @@ export function LevelsPage() {
   const [daily, setDaily] = useState(null)
   const [range, setRange] = useState({ start: 0, end: 16 })
   const [away, setAway] = useState(null)
+  const [focus, setFocus] = useState(0)
   const [error, setError] = useState(location.state?.notice ?? '')
   const [loading, setLoading] = useState(true)
 
   function syncRange(node) {
     const start = Math.max(0, Math.floor((node.scrollTop - MAP_PAD) / STEP) - 3)
     const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight - MAP_PAD) / STEP) + 4)
+    const mid = Math.min(
+      Math.max(0, levels.length - 1),
+      Math.max(0, Math.floor((node.scrollTop + node.clientHeight * 0.4 - MAP_PAD) / STEP)),
+    )
     setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    setFocus((prev) => (prev === mid ? prev : mid))
     const currentIndex = levels.findIndex((level) => level.status === 'current')
     if (currentIndex < 0) {
       setAway(null)
@@ -90,16 +96,16 @@ export function LevelsPage() {
     const current = levels.findIndex((level) => level.status === 'current')
     const index = current >= 0 ? current : 0
     node.scrollTop = Math.max(0, index * STEP + MAP_PAD - node.clientHeight * 0.32)
-    const start = Math.max(0, Math.floor((node.scrollTop - MAP_PAD) / STEP) - 3)
-    const end = Math.min(levels.length, Math.ceil((node.scrollTop + node.clientHeight - MAP_PAD) / STEP) + 4)
-    setRange({ start, end })
+    syncRange(node)
   }, [levels])
 
   const cleared = levels.filter((level) => level.status === 'cleared').length
-  const lookAt = levels[Math.min(levels.length - 1, range.start + 2)]
+  const lookAt = levels[focus] ?? levels[0]
   const seenChapter = lookAt ? Math.floor((lookAt.id - 1) / CHAPTER_SIZE) : 0
-  const currentLevel = levels.find((level) => level.status === 'current')
+  const currentLevel =
+    levels.find((level) => level.status === 'current') ?? levels.find((level) => level.id === cleared + 1)
   const host = LOCKED_CANDY[seenChapter % LOCKED_CANDY.length]
+  const land = landOf(seenChapter)
   const pathFrom = Math.max(0, range.start)
   const pathTo = Math.max(pathFrom, range.end - 1)
 
@@ -158,7 +164,13 @@ export function LevelsPage() {
         </button>
       ) : null}
       <div className="vine-wrap">
-      <div className="vine-scroll" ref={scrollerRef} onScroll={(event) => syncRange(event.currentTarget)}>
+      <div
+        className="vine-scroll"
+        data-land={land}
+        ref={scrollerRef}
+        onScroll={(event) => syncRange(event.currentTarget)}
+      >
+        <MapAtmosphere land={land} />
         <div className="vine" style={{ '--steps': levels.length, '--step': `${STEP}px`, '--map-pad': `${MAP_PAD}px` }}>
           {levels.length ? (
             <svg
@@ -178,18 +190,19 @@ export function LevelsPage() {
               <path className="vine-core" d={vineCurve(pathFrom, pathTo)} />
             </svg>
           ) : null}
-          {range.start === 0 ? <MapSky /> : null}
           {levels.slice(range.start, range.end).map((level) => {
             const index = level.id - 1
             const x = WAVE[index % WAVE.length]
             const candy = LOCKED_CANDY[index % LOCKED_CANDY.length]
-            const kind = propKind(index, CHAPTER_SIZE)
+            const spotLand = landOf(Math.floor(index / CHAPTER_SIZE))
+            const kind = propKind(index, CHAPTER_SIZE, spotLand)
             return (
               <Fragment key={level.id}>
                 {index % CHAPTER_SIZE === 0 ? (
                   <MapGrove
                     title={chapterTitle(index / CHAPTER_SIZE)}
                     color={candy}
+                    land={spotLand}
                     style={{
                       left: `${x > 50 ? 14 : 86}%`,
                       top: `calc(var(--map-pad) + (${index} + 0.5) * var(--step))`,
@@ -236,15 +249,14 @@ export function LevelsPage() {
           })}
         </div>
       </div>
-      {away && currentLevel ? (
+      {currentLevel && away ? (
         <button
           type="button"
           className={`back-to-current is-${away}`}
           onClick={jumpToCurrent}
-          aria-label={away === 'up' ? `回到上面的第 ${currentLevel.id} 关` : `回到下面的第 ${currentLevel.id} 关`}
         >
           <i aria-hidden="true" />
-          {currentLevel.id}
+          回到 {currentLevel.id}
         </button>
       ) : null}
       </div>
